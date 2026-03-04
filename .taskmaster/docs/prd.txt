@@ -1,1 +1,4 @@
-Build a simple tic tac toe web application
+Feature: Add AI to Tic-Tac-Toe
+1. Implement a minimax algorithm or a random AI move generator for the computer player.
+2. Update the game loop to allow the player to choose to play against the computer.
+3. Ensure the AI makes valid moves on the board.

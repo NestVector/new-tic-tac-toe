@@ -1,8 +1,13 @@
 const cells = document.querySelectorAll('.cell');
 const statusDisplay = document.getElementById('status');
 const resetBtn = document.getElementById('reset');
+const modeBtn = document.createElement('button');
+modeBtn.innerText = 'Switch to AI Mode';
+document.getElementById('game').insertBefore(modeBtn, document.getElementById('board'));
+
 let currentPlayer = 'X';
 let gameActive = true;
+let aiMode = false;
 let board = ["", "", "", "", "", "", "", "", ""];
 
 const winningConditions = [
@@ -15,13 +20,29 @@ function handleCellClick(e) {
     const clickedCell = e.target;
     const index = parseInt(clickedCell.getAttribute('data-cell-index'));
 
-    if (board[index] !== "" || !gameActive) return;
+    if (board[index] !== "" || !gameActive || (aiMode && currentPlayer === 'O')) return;
 
-    board[index] = currentPlayer;
-    clickedCell.innerText = currentPlayer;
+    makeMove(index, 'X');
     
+    if (aiMode && gameActive) {
+        // AI's turn
+        setTimeout(aiMove, 500);
+    }
+}
+
+function makeMove(index, player) {
+    board[index] = player;
+    cells[index].innerText = player;
     checkResult();
-    currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+    if(gameActive) currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+}
+
+function aiMove() {
+    let emptyIndices = board.map((val, idx) => val === "" ? idx : null).filter(val => val !== null);
+    if (emptyIndices.length > 0) {
+        let randomIndex = emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
+        makeMove(randomIndex, 'O');
+    }
 }
 
 function checkResult() {
@@ -53,4 +74,9 @@ resetBtn.addEventListener('click', () => {
     gameActive = true;
     currentPlayer = 'X';
     statusDisplay.innerText = "";
+});
+modeBtn.addEventListener('click', () => {
+    aiMode = !aiMode;
+    modeBtn.innerText = aiMode ? 'Switch to Human Mode' : 'Switch to AI Mode';
+    resetBtn.click();
 });
