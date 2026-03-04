@@ -1,0 +1,7 @@
+Project: Tic Tac Toe Web Application
+
+1. Setup project structure (HTML, CSS, JS).
+2. Create the game board interface.
+3. Implement game logic (handling player turns, win conditions, reset).
+4. Add basic styling to the board.
+5. Add game status display (winner/draw).
