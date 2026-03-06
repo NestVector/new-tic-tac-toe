@@ -12,6 +12,26 @@
             <button id="mode">Switch to AI Mode</button>
             <button id="settings-btn">Settings</button>
         </div>
+
+        <h1 class="game-title">Tic Tac Toe</h1>
+
+        <div class="scoreboard">
+            <div class="score-item score-x">
+                <span class="score-label">Player X</span>
+                <span class="score-value" id="score-x">0</span>
+            </div>
+            <div class="score-item score-draw">
+                <span class="score-label">Draws</span>
+                <span class="score-value" id="score-draw">0</span>
+            </div>
+            <div class="score-item score-o">
+                <span class="score-label">Player O</span>
+                <span class="score-value" id="score-o">0</span>
+            </div>
+        </div>
+
+        <div id="status"></div>
+
         <div class="board" id="board">
             <div class="cell" data-cell-index="0"></div>
             <div class="cell" data-cell-index="1"></div>
@@ -23,8 +43,11 @@
             <div class="cell" data-cell-index="7"></div>
             <div class="cell" data-cell-index="8"></div>
         </div>
-        <div id="status"></div>
-        <button id="reset">Reset Game</button>
+
+        <div class="action-bar">
+            <button id="reset">New Game</button>
+            <button id="reset-scores">Reset Scores</button>
+        </div>
     </div>
 
     <div id="settings-overlay" class="hidden">

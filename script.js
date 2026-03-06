@@ -1,14 +1,15 @@
 const cells = document.querySelectorAll('.cell');
 const statusDisplay = document.getElementById('status');
 const resetBtn = document.getElementById('reset');
-const modeBtn = document.createElement('button');
-modeBtn.innerText = 'Switch to AI Mode';
-document.getElementById('game').insertBefore(modeBtn, document.getElementById('board'));
+const resetScoresBtn = document.getElementById('reset-scores');
+const modeBtn = document.getElementById('mode');
 
 let currentPlayer = 'X';
 let gameActive = true;
 let aiMode = false;
 let board = ["", "", "", "", "", "", "", "", ""];
+
+const scores = { X: 0, O: 0, draw: 0 };
 
 const winningConditions = [
     [0, 1, 2], [3, 4, 5], [6, 7, 8],
@@ -16,69 +17,105 @@ const winningConditions = [
     [0, 4, 8], [2, 4, 6]
 ];
 
-function handleCellClick(e) {
-    const clickedCell = e.target;
-    const index = parseInt(clickedCell.getAttribute('data-cell-index'));
+function updateStatus(text, type) {
+    statusDisplay.textContent = text;
+    statusDisplay.className = type ? `status-${type.toLowerCase()}` : '';
+}
 
+function handleCellClick(e) {
+    const index = parseInt(e.target.getAttribute('data-cell-index'));
     if (board[index] !== "" || !gameActive || (aiMode && currentPlayer === 'O')) return;
 
     makeMove(index, 'X');
-    
+
     if (aiMode && gameActive) {
-        // AI's turn
-        setTimeout(aiMove, 500);
+        setTimeout(aiMove, 400);
     }
 }
 
 function makeMove(index, player) {
     board[index] = player;
-    cells[index].innerText = player;
-    checkResult();
-    if(gameActive) currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+    const cell = cells[index];
+    cell.textContent = player;
+    cell.classList.add(player.toLowerCase(), 'taken', 'pop');
+    cell.addEventListener('animationend', () => cell.classList.remove('pop'), { once: true });
+
+    const result = checkResult();
+    if (result === 'win') {
+        const winnerLabel = aiMode && player === 'O' ? 'AI' : `Player ${player}`;
+        updateStatus(`${winnerLabel} wins!`, player);
+        scores[player]++;
+        updateScoreDisplay();
+        gameActive = false;
+    } else if (result === 'draw') {
+        updateStatus("It's a draw!", 'draw');
+        scores.draw++;
+        updateScoreDisplay();
+        gameActive = false;
+    } else {
+        currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+        const nextLabel = aiMode && currentPlayer === 'O' ? "AI's turn" : `Player ${currentPlayer}'s turn`;
+        updateStatus(nextLabel);
+    }
 }
 
 function aiMove() {
-    let emptyIndices = board.map((val, idx) => val === "" ? idx : null).filter(val => val !== null);
+    if (!gameActive) return;
+    const emptyIndices = board.map((val, idx) => val === "" ? idx : null).filter(v => v !== null);
     if (emptyIndices.length > 0) {
-        let randomIndex = emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
-        makeMove(randomIndex, 'O');
+        const idx = emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
+        makeMove(idx, 'O');
     }
 }
 
 function checkResult() {
-    let roundWon = false;
-    for (let i = 0; i < winningConditions.length; i++) {
-        const [a, b, c] = winningConditions[i];
+    for (const [a, b, c] of winningConditions) {
         if (board[a] && board[a] === board[b] && board[a] === board[c]) {
-            roundWon = true;
-            break;
+            cells[a].classList.add('winner');
+            cells[b].classList.add('winner');
+            cells[c].classList.add('winner');
+            return 'win';
         }
     }
+    if (!board.includes("")) return 'draw';
+    return null;
+}
 
-    if (roundWon) {
-        statusDisplay.innerText = `Player ${currentPlayer} wins!`;
-        gameActive = false;
-        return;
-    }
+function updateScoreDisplay() {
+    document.getElementById('score-x').textContent = scores.X;
+    document.getElementById('score-o').textContent = scores.O;
+    document.getElementById('score-draw').textContent = scores.draw;
+}
 
-    if (!board.includes("")) {
-        statusDisplay.innerText = "Draw!";
-        gameActive = false;
-    }
+function resetGame() {
+    board = ["", "", "", "", "", "", "", "", ""];
+    cells.forEach(cell => {
+        cell.textContent = '';
+        cell.className = 'cell';
+    });
+    gameActive = true;
+    currentPlayer = 'X';
+    updateStatus("Player X's turn");
 }
 
 cells.forEach(cell => cell.addEventListener('click', handleCellClick));
-resetBtn.addEventListener('click', () => {
-    board = ["", "", "", "", "", "", "", "", ""];
-    cells.forEach(cell => cell.innerText = "");
-    gameActive = true;
-    currentPlayer = 'X';
-    statusDisplay.innerText = "";
+
+resetBtn.addEventListener('click', resetGame);
+
+resetScoresBtn.addEventListener('click', () => {
+    scores.X = 0;
+    scores.O = 0;
+    scores.draw = 0;
+    updateScoreDisplay();
+    resetGame();
 });
+
 modeBtn.addEventListener('click', () => {
     aiMode = !aiMode;
-    modeBtn.innerText = aiMode ? 'Switch to Human Mode' : 'Switch to AI Mode';
-    resetBtn.click();
+    modeBtn.textContent = aiMode ? 'Switch to Human Mode' : 'Switch to AI Mode';
+    const oLabel = document.querySelector('.score-item.score-o .score-label');
+    oLabel.textContent = aiMode ? 'AI' : 'Player O';
+    resetGame();
 });
 
 // Settings
@@ -86,7 +123,6 @@ const settingsBtn = document.getElementById('settings-btn');
 const settingsOverlay = document.getElementById('settings-overlay');
 const settingsClose = document.getElementById('settings-close');
 const darkModeToggle = document.getElementById('dark-mode-toggle');
-
 const settingsPanel = document.getElementById('settings-panel');
 
 function openSettings() {
@@ -100,7 +136,6 @@ function closeSettings() {
 }
 
 settingsBtn.addEventListener('click', openSettings);
-
 settingsClose.addEventListener('click', closeSettings);
 
 settingsOverlay.addEventListener('click', (e) => {
@@ -131,8 +166,11 @@ darkModeToggle.addEventListener('change', () => {
     localStorage.setItem('darkMode', darkModeToggle.checked);
 });
 
-// Load saved dark mode preference
+// Load saved preferences
 if (localStorage.getItem('darkMode') === 'true') {
     darkModeToggle.checked = true;
     document.body.classList.add('dark-mode');
 }
+
+// Init status
+updateStatus("Player X's turn");
