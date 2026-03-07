@@ -16,6 +16,7 @@
 <nav id="tab-bar">
     <button class="tab-btn active" data-tab="snl" id="tab-snl">🎲 <span id="tab-snl-label">Creatures &amp; Ladders</span></button>
     <button class="tab-btn" data-tab="ttt" id="tab-ttt">❌ Tic-Tac-Toe</button>
+    <button id="mute-btn" class="mute-btn" aria-label="Mute sounds" title="Mute / Unmute sounds">🔊</button>
 </nav>
 
 <main id="main-content">
@@ -26,6 +27,7 @@
         <!-- Setup Screen -->
         <div id="snl-setup">
             <h1 class="kids-title" id="snl-main-title">🎲 Creatures &amp; Ladders</h1>
+            <button class="how-to-play-btn" id="snl-how-to-play-btn">❓ How to Play</button>
 
             <div class="setup-card">
                 <h2 class="setup-heading">Choose the hazard! 🎯</h2>
@@ -41,8 +43,8 @@
             <div class="setup-card">
                 <h2 class="setup-heading">How many players? 👥</h2>
                 <div id="player-count-selector" role="group" aria-label="Player count">
-                    <button class="count-btn" data-count="2" aria-pressed="false">2</button>
-                    <button class="count-btn active" data-count="3" aria-pressed="true">3</button>
+                    <button class="count-btn active" data-count="2" aria-pressed="true">2</button>
+                    <button class="count-btn" data-count="3" aria-pressed="false">3</button>
                     <button class="count-btn" data-count="4" aria-pressed="false">4</button>
                 </div>
             </div>
@@ -87,6 +89,7 @@
                 <button id="mp-btn">Multiplayer</button>
                 <button id="mode">Switch to AI Mode</button>
                 <button id="settings-btn">Settings</button>
+                <button id="ttt-how-to-play-btn" class="how-to-play-top-btn">❓</button>
             </div>
 
             <h1 class="game-title">Tic Tac Toe</h1>
@@ -184,6 +187,38 @@
             <input type="text" id="player-o-name" maxlength="16" autocomplete="off">
         </div>
         <button id="settings-close">Close</button>
+    </div>
+</div>
+
+<!-- How to Play — Creatures & Ladders -->
+<div id="snl-htp-overlay" class="htp-overlay hidden">
+    <div class="htp-panel" role="dialog" aria-modal="true" aria-labelledby="snl-htp-heading">
+        <h2 id="snl-htp-heading">🎲 How to Play</h2>
+        <div class="htp-rules">
+            <div class="htp-rule">🎯 <strong>Goal:</strong> Be the first player to reach square <strong>100</strong>!</div>
+            <div class="htp-rule">🎲 <strong>Rolling:</strong> Press <em>Roll!</em> to roll the dice and move your token that many squares forward.</div>
+            <div class="htp-rule">🪜 <strong>Ladders</strong> (yellow lines): Land on the <em>bottom</em> of a ladder and zoom up to a higher square — lucky you!</div>
+            <div class="htp-rule">🐸 <strong>Hazards</strong> (coloured animals): Land on a hazard head and slide <em>down</em> to a lower square — watch out!</div>
+            <div class="htp-rule">🏆 <strong>Winning:</strong> First player to land <em>exactly</em> on square 100 wins! (You must roll the exact number or stay put.)</div>
+            <div class="htp-rule">🤖 <strong>AI Players:</strong> Toggle the switch on a player slot to let the computer play that turn automatically.</div>
+        </div>
+        <button class="htp-close big-btn" id="snl-htp-close">Got it! Let's play! 🚀</button>
+    </div>
+</div>
+
+<!-- How to Play — Tic-Tac-Toe -->
+<div id="ttt-htp-overlay" class="htp-overlay hidden">
+    <div class="htp-panel" role="dialog" aria-modal="true" aria-labelledby="ttt-htp-heading">
+        <h2 id="ttt-htp-heading">❌ How to Play</h2>
+        <div class="htp-rules">
+            <div class="htp-rule">🎯 <strong>Goal:</strong> Get <strong>3 in a row</strong> — across, down, or diagonally!</div>
+            <div class="htp-rule">❌ <strong>X goes first.</strong> Players take turns clicking empty squares to place their mark.</div>
+            <div class="htp-rule">🏆 <strong>Winning:</strong> The first player to fill a full row, column, or diagonal wins!</div>
+            <div class="htp-rule">🤝 <strong>Draw:</strong> If all 9 squares are filled and nobody has 3 in a row, it's a draw!</div>
+            <div class="htp-rule">🤖 <strong>AI Mode:</strong> Click <em>Switch to AI Mode</em> to play against the computer. Change difficulty in Settings.</div>
+            <div class="htp-rule">↩️ <strong>Undo:</strong> Made a mistake? Hit <em>Undo</em> (human vs human only) to take back your last move.</div>
+        </div>
+        <button class="htp-close big-btn" id="ttt-htp-close">Got it! Let's play! 🚀</button>
     </div>
 </div>
 
