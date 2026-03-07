@@ -12,6 +12,21 @@
 <!-- Full-screen confetti overlay -->
 <div id="confetti-container" aria-hidden="true"></div>
 
+<!-- Age Selector Bar -->
+<div id="age-bar">
+    <span class="age-bar-label">🎂 My age:</span>
+    <div class="age-pills">
+        <button class="age-pill" data-age="5">5</button>
+        <button class="age-pill" data-age="6">6</button>
+        <button class="age-pill" data-age="7">7</button>
+        <button class="age-pill" data-age="8">8</button>
+        <button class="age-pill" data-age="9">9</button>
+        <button class="age-pill" data-age="10">10</button>
+        <button class="age-pill" data-age="11">11</button>
+        <button class="age-pill" data-age="12plus">12+</button>
+    </div>
+</div>
+
 <!-- Tab Navigation -->
 <nav id="tab-bar">
     <button class="tab-btn active" data-tab="snl" id="tab-snl">🎲 <span id="tab-snl-label">Creatures &amp; Ladders</span></button>
@@ -54,31 +69,77 @@
                 <div id="snl-player-configs"></div>
             </div>
 
-            <button id="snl-start-btn" class="big-btn">🚀 Let's Play!</button>
+            <div class="snl-start-row">
+                <button id="snl-start-btn" class="big-btn">🚀 Let's Play!</button>
+                <button id="snl-mp-open-btn" class="big-btn snl-mp-open-btn">🌐 Play Online</button>
+            </div>
         </div>
 
         <!-- Game Screen -->
         <div id="snl-game-screen" class="hidden">
 
-            <div id="snl-game-header">
-                <h2 id="snl-turn-display">Player 1's Turn!</h2>
-                <p id="snl-message" aria-live="polite"></p>
+            <div id="snl-game-layout">
+                <div id="snl-board-area">
+                    <div id="snl-game-header">
+                        <h2 id="snl-turn-display">Player 1's Turn!</h2>
+                        <p id="snl-message" aria-live="polite"></p>
+                    </div>
+
+                    <div id="snl-board-container" aria-label="Game board">
+                        <div id="snl-board"></div>
+                        <svg id="snl-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
+                        <div id="snl-tokens" aria-hidden="true"></div>
+                    </div>
+                </div>
+
+                <div id="snl-sidebar">
+                    <div id="snl-dice-section">
+                        <!-- 3D CSS Dice -->
+                        <div id="snl-dice-3d" class="dice-3d-wrap" role="img" aria-label="Dice">
+                            <div class="dice-cube" id="dice-cube">
+                                <div class="dice-face face-1">
+                                    <span class="dot"></span>
+                                </div>
+                                <div class="dice-face face-2">
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                </div>
+                                <div class="dice-face face-3">
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                </div>
+                                <div class="dice-face face-4">
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                </div>
+                                <div class="dice-face face-5">
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                </div>
+                                <div class="dice-face face-6">
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                </div>
+                            </div>
+                        </div>
+                        <button id="snl-roll-btn" class="big-btn">🎲 Roll!</button>
+                    </div>
+
+                    <div id="snl-players-status"></div>
+
+                    <button id="snl-back-btn" class="secondary-btn">← New Setup</button>
+                </div>
             </div>
-
-            <div id="snl-board-container" aria-label="Game board">
-                <div id="snl-board"></div>
-                <svg id="snl-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
-                <div id="snl-tokens" aria-hidden="true"></div>
-            </div>
-
-            <div id="snl-dice-section">
-                <div id="snl-dice" role="img" aria-label="Dice">⚀</div>
-                <button id="snl-roll-btn" class="big-btn">🎲 Roll!</button>
-            </div>
-
-            <div id="snl-players-status"></div>
-
-            <button id="snl-back-btn" class="secondary-btn">← New Setup</button>
         </div>
     </div>
 
@@ -134,7 +195,7 @@
 
 </main>
 
-<!-- Multiplayer Overlay -->
+<!-- Multiplayer Overlay (TTT) -->
 <div id="mp-overlay" class="hidden">
     <div id="mp-panel" role="dialog" aria-modal="true" aria-labelledby="mp-heading">
         <h2 id="mp-heading">Multiplayer</h2>
@@ -159,6 +220,31 @@
     </div>
 </div>
 
+<!-- S&L Multiplayer Overlay -->
+<div id="snl-mp-overlay" class="mp-overlay hidden">
+    <div id="snl-mp-panel" class="mp-panel" role="dialog" aria-modal="true" aria-labelledby="snl-mp-heading">
+        <h2 id="snl-mp-heading">🌐 Play Online</h2>
+        <div id="snl-mp-lobby">
+            <button id="snl-mp-create">Create Game Room</button>
+            <p class="mp-or">— or —</p>
+            <div class="mp-join-row">
+                <input id="snl-mp-code-input" type="text" placeholder="Enter room code" autocomplete="off" style="text-transform:uppercase">
+                <button id="snl-mp-join">Join!</button>
+            </div>
+        </div>
+        <div id="snl-mp-waiting" class="hidden">
+            <p class="mp-label">Your room code:</p>
+            <div class="mp-code-box">
+                <div id="snl-mp-room-code" style="font-size:1rem;font-weight:900;letter-spacing:0.04em;color:var(--text);flex:1;word-break:break-all;">—</div>
+                <button id="snl-mp-copy">Copy</button>
+            </div>
+            <p id="snl-mp-hint" class="mp-hint-text">Connecting...</p>
+        </div>
+        <p id="snl-mp-status-text" class="mp-status"></p>
+        <button id="snl-mp-close" class="secondary-btn">Close</button>
+    </div>
+</div>
+
 <!-- Settings Overlay -->
 <div id="settings-overlay" class="hidden">
     <div id="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-heading">
@@ -176,6 +262,14 @@
                 <option value="easy">Easy</option>
                 <option value="medium">Medium</option>
                 <option value="hard">Hard</option>
+            </select>
+        </div>
+        <div class="setting-row" id="snl-difficulty-row">
+            <label for="snl-difficulty-select">🎲 S&amp;L AI Level</label>
+            <select id="snl-difficulty-select">
+                <option value="easy">Easy 🐣</option>
+                <option value="medium">Medium 🎯</option>
+                <option value="hard">Hard 🏆</option>
             </select>
         </div>
         <div class="setting-row name-row">

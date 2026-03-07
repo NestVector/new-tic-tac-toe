@@ -1,6 +1,48 @@
 'use strict';
 
 /* ═══════════════════════════════════════════════════════════════
+   AGE SYSTEM
+═══════════════════════════════════════════════════════════════ */
+const AGE_GROUP_MAP = {
+    '5': 'age-tiny', '6': 'age-tiny',
+    '7': 'age-small', '8': 'age-small',
+    '9': 'age-mid', '10': 'age-mid',
+    '11': 'age-big', '12plus': 'age-big',
+};
+const AGE_STEP_DELAY = {
+    'age-tiny': 280, 'age-small': 200, 'age-mid': 170, 'age-big': 130,
+};
+
+let currentAgeGroup = 'age-mid';
+
+function applyAge(ageKey) {
+    const group = AGE_GROUP_MAP[ageKey] || 'age-mid';
+    currentAgeGroup = group;
+    const body = document.body;
+    // Remove all age classes
+    body.classList.remove('age-tiny', 'age-small', 'age-mid', 'age-big');
+    body.classList.add(group);
+    // Update pill active state
+    document.querySelectorAll('.age-pill').forEach(p => {
+        p.classList.toggle('active-age', p.dataset.age === ageKey);
+    });
+    localStorage.setItem('selectedAge', ageKey);
+}
+
+function getStepDelay() {
+    return AGE_STEP_DELAY[currentAgeGroup] || 170;
+}
+
+// Init age system
+(function initAgeSystem() {
+    const savedAge = localStorage.getItem('selectedAge') || '9';
+    applyAge(savedAge);
+    document.querySelectorAll('.age-pill').forEach(pill => {
+        pill.addEventListener('click', () => applyAge(pill.dataset.age));
+    });
+})();
+
+/* ═══════════════════════════════════════════════════════════════
    SOUND ENGINE  (Web Audio API)
 ═══════════════════════════════════════════════════════════════ */
 class SoundEngine {
@@ -215,6 +257,56 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 });
 
 /* ═══════════════════════════════════════════════════════════════
+   3D DICE — FACE TRANSFORMS
+═══════════════════════════════════════════════════════════════ */
+const FACE_TRANSFORMS = {
+    1: 'rotateX(0deg) rotateY(0deg)',
+    2: 'rotateX(0deg) rotateY(90deg)',
+    3: 'rotateX(90deg) rotateY(0deg)',
+    4: 'rotateX(-90deg) rotateY(0deg)',
+    5: 'rotateX(0deg) rotateY(-90deg)',
+    6: 'rotateX(0deg) rotateY(180deg)',
+};
+
+function rollDice3D(value) {
+    return new Promise((resolve) => {
+        const cube = document.getElementById('dice-cube');
+        if (!cube) { resolve(); return; }
+        cube.classList.remove('rolling');
+        // Force reflow
+        void cube.offsetWidth;
+        cube.classList.add('rolling');
+        function onEnd() {
+            cube.removeEventListener('animationend', onEnd);
+            cube.classList.remove('rolling');
+            cube.style.transform = FACE_TRANSFORMS[value];
+            resolve();
+        }
+        cube.addEventListener('animationend', onEnd, { once: true });
+        // Fallback in case animationend doesn't fire
+        setTimeout(() => {
+            cube.removeEventListener('animationend', onEnd);
+            cube.classList.remove('rolling');
+            cube.style.transform = FACE_TRANSFORMS[value];
+            resolve();
+        }, 1100);
+    });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   S&L MULTIPLAYER — ROOM CODE GENERATION
+═══════════════════════════════════════════════════════════════ */
+const SNL_WORDS_A = ['HAPPY','SILLY','BOUNCY','FLUFFY','SPARKLY','RAINBOW','WIGGLY','GIGGLY','ZIPPY','SNAPPY','DIZZY','FUZZY'];
+const SNL_WORDS_B = ['PANDA','BUNNY','TIGER','UNICORN','DRAGON','PUPPY','KITTY','PENGUIN','MONKEY','TURTLE','PARROT','HEDGEHOG'];
+
+function generateSnlRoomCode() {
+    const a = SNL_WORDS_A[Math.floor(Math.random() * SNL_WORDS_A.length)];
+    const b = SNL_WORDS_B[Math.floor(Math.random() * SNL_WORDS_B.length)];
+    const n = String(Math.floor(Math.random() * 90) + 10);
+    return a + b + n;
+}
+
+/* ═══════════════════════════════════════════════════════════════
    CREATURES & LADDERS — CONSTANTS
 ═══════════════════════════════════════════════════════════════ */
 const ANIMALS = {
@@ -226,9 +318,18 @@ const ANIMALS = {
 };
 
 // Hazards: head (higher square) → tail (lower square)
-const SNL_HAZARDS = { 99: 78, 87: 24, 64: 60, 62: 19, 17: 7 };
+const SNL_HAZARDS_FULL = { 99: 78, 87: 24, 64: 60, 62: 19, 17: 7 };
+const SNL_HAZARDS_TINY = { 87: 24, 62: 19, 17: 7 }; // Only 3 for age-tiny
 // Ladders: bottom → top
-const SNL_LADDERS = { 4: 25, 9: 31, 20: 55, 28: 84, 40: 59, 51: 67, 63: 81, 71: 91 };
+const SNL_LADDERS_FULL = { 4: 25, 9: 31, 20: 55, 28: 84, 40: 59, 51: 67, 63: 81, 71: 91 };
+const SNL_LADDERS_TINY = { 4: 25, 20: 55, 40: 59, 71: 91 }; // Only 4 for age-tiny
+
+function getSNLHazards() {
+    return currentAgeGroup === 'age-tiny' ? SNL_HAZARDS_TINY : SNL_HAZARDS_FULL;
+}
+function getSNLLadders() {
+    return currentAgeGroup === 'age-tiny' ? SNL_LADDERS_TINY : SNL_LADDERS_FULL;
+}
 
 const DICE_FACES = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
 const TOKEN_CLASSES = ['p0', 'p1', 'p2', 'p3'];
@@ -272,6 +373,12 @@ class CreaturesGame {
         this.busy = false;
         this.over = false;
         this._aiTimer = null;
+        // Multiplayer
+        this.mpConn = null;
+        this.myPlayerIdx = null;
+        this.mpMode = false;
+        // AI difficulty
+        this.aiDifficulty = localStorage.getItem('snlAiDifficulty') || 'medium';
     }
 
     destroy() {
@@ -296,8 +403,8 @@ class CreaturesGame {
 
                 if (sq === 1)   cell.classList.add('snl-cell-start');
                 if (sq === 100) cell.classList.add('snl-cell-finish');
-                if (SNL_HAZARDS[sq])  cell.classList.add('snl-cell-hazard-head');
-                if (SNL_LADDERS[sq])  cell.classList.add('snl-cell-ladder-bot');
+                if (getSNLHazards()[sq])  cell.classList.add('snl-cell-hazard-head');
+                if (getSNLLadders()[sq])  cell.classList.add('snl-cell-ladder-bot');
 
                 const num = document.createElement('span');
                 num.className = 'snl-cell-num';
@@ -309,12 +416,12 @@ class CreaturesGame {
                     ic.className = 'snl-cell-icon';
                     ic.textContent = '🏆';
                     cell.appendChild(ic);
-                } else if (SNL_HAZARDS[sq]) {
+                } else if (getSNLHazards()[sq]) {
                     const ic = document.createElement('span');
                     ic.className = 'snl-cell-icon';
                     ic.textContent = ANIMALS[this.animalKey].emoji;
                     cell.appendChild(ic);
-                } else if (SNL_LADDERS[sq]) {
+                } else if (getSNLLadders()[sq]) {
                     const ic = document.createElement('span');
                     ic.className = 'snl-cell-icon';
                     ic.textContent = '🪜';
@@ -358,7 +465,7 @@ class CreaturesGame {
         svg.appendChild(defs);
 
         // Draw ladders
-        Object.entries(SNL_LADDERS).forEach(([from, to]) => {
+        Object.entries(getSNLLadders()).forEach(([from, to]) => {
             const f = squareCenter(+from);
             const t = squareCenter(+to);
             const dx = t.x - f.x, dy = t.y - f.y;
@@ -402,7 +509,7 @@ class CreaturesGame {
         });
 
         // Draw hazard animals
-        Object.entries(SNL_HAZARDS).forEach(([head, tail], i) => {
+        Object.entries(getSNLHazards()).forEach(([head, tail], i) => {
             const h = squareCenter(+head);
             const t = squareCenter(+tail);
             const cx = (h.x + t.x) / 2 + (i % 2 === 0 ? 12 : -12);
@@ -501,42 +608,35 @@ class CreaturesGame {
     setRollBtnState() {
         const btn = document.getElementById('snl-roll-btn');
         const p = this.currentPlayer;
-        btn.disabled = this.busy || this.over || p.isAI;
+        const mpBlock = this.mpMode && this.myPlayerIdx !== this.currentIdx;
+        btn.disabled = this.busy || this.over || p.isAI || mpBlock;
     }
 
     /* ── Roll ── */
     async roll() {
         if (this.busy || this.over) return;
         if (this.currentPlayer.isAI) return;
-        await this._doRoll();
+        if (this.mpMode && this.myPlayerIdx !== this.currentIdx) return;
+        const result = Math.floor(Math.random() * 6) + 1;
+        // In MP mode, send the roll to peer before animating
+        if (this.mpMode && this.mpConn) {
+            try { this.mpConn.send({ type: 'snl-roll', result }); } catch (_) {}
+        }
+        await this._doRoll(result);
     }
 
-    async _doRoll() {
+    async _doRoll(predeterminedResult) {
         this.busy = true;
         this.setRollBtnState();
         sound.playDice();
 
-        const diceEl = document.getElementById('snl-dice');
-        diceEl.classList.add('dice-rolling');
-        diceEl.classList.remove('dice-land');
+        // Determine result
+        const result = (predeterminedResult !== undefined)
+            ? predeterminedResult
+            : Math.floor(Math.random() * 6) + 1;
 
-        const result = await new Promise(resolve => {
-            let count = 0;
-            const iv = setInterval(() => {
-                diceEl.textContent = DICE_FACES[Math.floor(Math.random() * 6)];
-                count++;
-                if (count >= 13) {
-                    clearInterval(iv);
-                    const r = Math.floor(Math.random() * 6) + 1;
-                    diceEl.textContent = DICE_FACES[r - 1];
-                    resolve(r);
-                }
-            }, 70);
-        });
-
-        diceEl.classList.remove('dice-rolling');
-        diceEl.classList.add('dice-land');
-        setTimeout(() => diceEl.classList.remove('dice-land'), 400);
+        // Animate 3D dice
+        await rollDice3D(result);
 
         await this._movePlayer(result);
     }
@@ -555,11 +655,12 @@ class CreaturesGame {
 
         // Step-by-step movement
         const from = player.position;
+        const stepDelay = getStepDelay();
         for (let pos = from + 1; pos <= newPos; pos++) {
             player.position = pos;
             this._placeToken(this.currentIdx);
             sound.playStep();
-            await this._sleep(170);
+            await this._sleep(stepDelay);
         }
 
         // Check win first
@@ -569,10 +670,13 @@ class CreaturesGame {
         }
 
         // Check hazard
-        if (SNL_HAZARDS[player.position]) {
-            const dest = SNL_HAZARDS[player.position];
+        if (getSNLHazards()[player.position]) {
+            const dest = getSNLHazards()[player.position];
             const a = ANIMALS[this.animalKey];
-            this.setMessage(`${a.emoji} Oh no! ${a.name} slide you to ${dest}!`);
+            const msg = currentAgeGroup === 'age-tiny'
+                ? `${a.emoji} Oh no! Go back to ${dest}!`
+                : `${a.emoji} Oh no! ${a.name} slide you to ${dest}!`;
+            this.setMessage(msg);
             sound.playAnimal(this.animalKey);
             const container = document.getElementById('snl-board-container');
             container.classList.add('board-shake');
@@ -582,9 +686,12 @@ class CreaturesGame {
             this._placeToken(this.currentIdx);
             await this._sleep(400);
 
-        } else if (SNL_LADDERS[player.position]) {
-            const dest = SNL_LADDERS[player.position];
-            this.setMessage(`🪜 Lucky! Ladder up to ${dest}!`);
+        } else if (getSNLLadders()[player.position]) {
+            const dest = getSNLLadders()[player.position];
+            const msg = currentAgeGroup === 'age-tiny'
+                ? `🪜 Yay! Move forward to ${dest}!`
+                : `🪜 Lucky! Ladder up to ${dest}!`;
+            this.setMessage(msg);
             sound.playLadder();
             await this._sleep(700);
             player.position = dest;
@@ -632,10 +739,26 @@ class CreaturesGame {
         this.setRollBtnState();
 
         if (this.players[this.currentIdx].isAI && !this.over) {
+            const diff = this.aiDifficulty || 'medium';
+            let delay = 1100;
+            if (diff === 'easy') delay = 1400;
+            else if (diff === 'hard') delay = 700;
+
+            // Easy: 30% chance to skip turn
+            if (diff === 'easy' && Math.random() < 0.30) {
+                this.setMessage('🤖 Computer is thinking...');
+                this._aiTimer = setTimeout(() => {
+                    this._aiTimer = null;
+                    this.busy = false;
+                    this._nextTurn(); // skip
+                }, delay);
+                return;
+            }
+
             this._aiTimer = setTimeout(() => {
                 this._aiTimer = null;
                 this._doRoll();
-            }, 1100);
+            }, delay);
         }
     }
 }
@@ -728,6 +851,7 @@ document.getElementById('snl-start-btn').addEventListener('click', () => {
 
     if (snlGame) snlGame.destroy();
     snlGame = new CreaturesGame(configs, snlAnimal);
+    snlGame.aiDifficulty = localStorage.getItem('snlAiDifficulty') || 'medium';
 
     document.getElementById('snl-setup').classList.add('hidden');
     document.getElementById('snl-game-screen').classList.remove('hidden');
@@ -755,10 +879,241 @@ document.getElementById('snl-roll-btn').addEventListener('click', () => {
 
 // Back to setup
 document.getElementById('snl-back-btn').addEventListener('click', () => {
-    if (snlGame) { snlGame.destroy(); snlGame = null; }
+    if (snlGame) {
+        snlGame.destroy();
+        // Close any MP connection
+        if (snlGame.mpConn) { try { snlGame.mpConn.close(); } catch (_) {} }
+        snlGame = null;
+    }
+    snlDestroyPeer();
     document.getElementById('snl-game-screen').classList.add('hidden');
     document.getElementById('snl-setup').classList.remove('hidden');
 });
+
+/* ═══════════════════════════════════════════════════════════════
+   SNL — S&L MULTIPLAYER (PeerJS)
+═══════════════════════════════════════════════════════════════ */
+let snlPeer = null;
+let snlConn = null;
+
+function snlDestroyPeer() {
+    if (snlConn) { try { snlConn.close(); } catch (_) {} snlConn = null; }
+    if (snlPeer) { try { snlPeer.destroy(); } catch (_) {} snlPeer = null; }
+}
+
+function snlSetMpStatus(text, type) {
+    const el = document.getElementById('snl-mp-status-text');
+    if (!el) return;
+    el.textContent = text;
+    el.className = `mp-status${type ? ' ' + type : ''}`;
+}
+
+function openSnlMpOverlay() {
+    const overlay = document.getElementById('snl-mp-overlay');
+    if (!overlay) return;
+    overlay.classList.remove('hidden');
+    document.getElementById('snl-mp-lobby').classList.remove('hidden');
+    document.getElementById('snl-mp-waiting').classList.add('hidden');
+    snlSetMpStatus('');
+    const inp = document.getElementById('snl-mp-code-input');
+    if (inp) inp.value = '';
+}
+
+function closeSnlMpOverlay() {
+    const overlay = document.getElementById('snl-mp-overlay');
+    if (overlay) overlay.classList.add('hidden');
+}
+
+function startSnlMultiplayerGame(myIdx) {
+    closeSnlMpOverlay();
+
+    // Build a 2-player game (host = P1/idx 0, guest = P2/idx 1)
+    const hostName = (document.querySelector('.snl-name-input') || {}).value || 'Player 1';
+    const configs = [
+        { name: hostName.trim() || 'Player 1', isAI: false },
+        { name: 'Online Player', isAI: false },
+    ];
+
+    if (snlGame) snlGame.destroy();
+    snlGame = new CreaturesGame(configs, snlAnimal);
+    snlGame.mpMode = true;
+    snlGame.myPlayerIdx = myIdx;
+    snlGame.mpConn = snlConn;
+    snlGame.aiDifficulty = localStorage.getItem('snlAiDifficulty') || 'medium';
+
+    document.getElementById('snl-setup').classList.add('hidden');
+    document.getElementById('snl-game-screen').classList.remove('hidden');
+
+    snlGame.buildBoard();
+    snlGame.setTurnDisplay();
+    snlGame.setMessage(myIdx === 0 ? "Your turn! Roll the dice!" : "Waiting for opponent to roll...");
+    snlGame.updatePlayersPanel();
+    snlGame.setRollBtnState();
+    snlGame._updateActiveToken();
+}
+
+function setupSnlConnHandlers(connection, isHost) {
+    snlConn = connection;
+
+    if (!isHost) {
+        // Guest side: wait for connection open, then start game
+        connection.on('open', () => {
+            snlSetMpStatus('Connected!', 'connected');
+            const hint = document.getElementById('snl-mp-hint');
+            if (hint) hint.textContent = 'Connected! Starting game...';
+            setTimeout(() => startSnlMultiplayerGame(1), 700);
+        });
+    }
+
+    connection.on('data', (data) => {
+        if (!snlGame || !snlGame.mpMode) return;
+        if (data.type === 'snl-roll') {
+            if (typeof data.result === 'number' && data.result >= 1 && data.result <= 6) {
+                if (!snlGame.busy && !snlGame.over) {
+                    snlGame._doRoll(data.result);
+                }
+            }
+        } else if (data.type === 'snl-reset') {
+            const myIdx = snlGame ? snlGame.myPlayerIdx : (isHost ? 0 : 1);
+            if (snlGame) snlGame.destroy();
+            startSnlMultiplayerGame(myIdx);
+        }
+    });
+
+    connection.on('close', () => {
+        if (snlGame && snlGame.mpMode) {
+            snlGame.setMessage('Opponent disconnected.');
+            snlGame.mpMode = false;
+            snlGame.mpConn = null;
+            snlGame.setRollBtnState();
+        }
+        snlConn = null;
+    });
+
+    connection.on('error', (err) => {
+        snlSetMpStatus(`Error: ${err.type}`, 'error');
+    });
+}
+
+// Open MP overlay button
+const snlMpOpenBtn = document.getElementById('snl-mp-open-btn');
+if (snlMpOpenBtn) {
+    snlMpOpenBtn.addEventListener('click', openSnlMpOverlay);
+}
+
+// Close MP overlay
+const snlMpCloseBtn = document.getElementById('snl-mp-close');
+if (snlMpCloseBtn) {
+    snlMpCloseBtn.addEventListener('click', () => {
+        closeSnlMpOverlay();
+        snlDestroyPeer();
+    });
+}
+
+const snlMpOverlay = document.getElementById('snl-mp-overlay');
+if (snlMpOverlay) {
+    snlMpOverlay.addEventListener('click', (e) => {
+        if (e.target === snlMpOverlay) {
+            closeSnlMpOverlay();
+            snlDestroyPeer();
+        }
+    });
+}
+
+// Create game room
+const snlMpCreateBtn = document.getElementById('snl-mp-create');
+if (snlMpCreateBtn) {
+    snlMpCreateBtn.addEventListener('click', () => {
+        snlDestroyPeer();
+        document.getElementById('snl-mp-lobby').classList.add('hidden');
+        document.getElementById('snl-mp-waiting').classList.remove('hidden');
+        document.getElementById('snl-mp-room-code').textContent = '—';
+        const hint = document.getElementById('snl-mp-hint');
+        if (hint) hint.textContent = 'Connecting to server...';
+        snlSetMpStatus('');
+        const snlMpCopyBtn = document.getElementById('snl-mp-copy');
+        if (snlMpCopyBtn) snlMpCopyBtn.disabled = true;
+
+        const roomCode = generateSnlRoomCode();
+        snlPeer = new Peer(roomCode);
+
+        snlPeer.on('open', (id) => {
+            document.getElementById('snl-mp-room-code').textContent = id;
+            if (hint) hint.textContent = 'Waiting for a friend to join...';
+            if (snlMpCopyBtn) snlMpCopyBtn.disabled = false;
+        });
+
+        snlPeer.on('connection', (connection) => {
+            if (snlConn) { connection.close(); return; }
+            if (hint) hint.textContent = 'Friend connected! Starting game...';
+            setupSnlConnHandlers(connection, true);
+            // Host is player index 0 — start after connection opens
+            connection.on('open', () => {
+                setTimeout(() => startSnlMultiplayerGame(0), 700);
+            });
+        });
+
+        snlPeer.on('error', (err) => {
+            if (err.type === 'unavailable-id') {
+                snlPeer.destroy();
+                snlMpCreateBtn.click();
+                return;
+            }
+            snlSetMpStatus(`Error: ${err.type}`, 'error');
+            document.getElementById('snl-mp-lobby').classList.remove('hidden');
+            document.getElementById('snl-mp-waiting').classList.add('hidden');
+        });
+    });
+}
+
+// Copy room code
+const snlMpCopyBtn = document.getElementById('snl-mp-copy');
+if (snlMpCopyBtn) {
+    snlMpCopyBtn.addEventListener('click', () => {
+        const code = document.getElementById('snl-mp-room-code').textContent;
+        if (code && code !== '—') {
+            navigator.clipboard.writeText(code).then(() => {
+                snlMpCopyBtn.textContent = 'Copied!';
+                setTimeout(() => { snlMpCopyBtn.textContent = 'Copy'; }, 2000);
+            });
+        }
+    });
+}
+
+// Join game room
+const snlMpJoinBtn = document.getElementById('snl-mp-join');
+if (snlMpJoinBtn) {
+    snlMpJoinBtn.addEventListener('click', () => {
+        const inp = document.getElementById('snl-mp-code-input');
+        const code = (inp ? inp.value.trim().toUpperCase() : '');
+        if (!code) return;
+        snlMpJoinBtn.disabled = true;
+        snlDestroyPeer();
+        snlSetMpStatus('Connecting...', '');
+        snlPeer = new Peer();
+        snlPeer.on('open', () => {
+            const c = snlPeer.connect(code, { reliable: true });
+            setupSnlConnHandlers(c, false);
+        });
+        snlPeer.on('error', (err) => {
+            snlSetMpStatus(`Error: ${err.type}`, 'error');
+            snlMpJoinBtn.disabled = false;
+        });
+    });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SNL AI DIFFICULTY SETTING
+═══════════════════════════════════════════════════════════════ */
+const snlDifficultySelect = document.getElementById('snl-difficulty-select');
+if (snlDifficultySelect) {
+    snlDifficultySelect.value = localStorage.getItem('snlAiDifficulty') || 'medium';
+    snlDifficultySelect.addEventListener('change', () => {
+        const val = snlDifficultySelect.value;
+        localStorage.setItem('snlAiDifficulty', val);
+        if (snlGame) snlGame.aiDifficulty = val;
+    });
+}
 
 /* ═══════════════════════════════════════════════════════════════
    TIC-TAC-TOE
@@ -1340,11 +1695,9 @@ muteBtn.addEventListener('click', () => {
 ═══════════════════════════════════════════════════════════════ */
 function openHtp(overlayId) {
     document.getElementById(overlayId).classList.remove('hidden');
-    document.body.style.overflow = 'hidden';
 }
 function closeHtp(overlayId) {
     document.getElementById(overlayId).classList.add('hidden');
-    document.body.style.overflow = '';
 }
 
 document.getElementById('snl-how-to-play-btn').addEventListener('click', () => openHtp('snl-htp-overlay'));
