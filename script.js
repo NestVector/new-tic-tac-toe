@@ -15,6 +15,14 @@ const AGE_STEP_DELAY = {
 
 let currentAgeGroup = 'age-mid';
 
+// Age → default AI difficulty mapping
+const AGE_AI_DIFFICULTY = {
+    'age-tiny':  'easy',
+    'age-small': 'easy',
+    'age-mid':   'medium',
+    'age-big':   'hard',
+};
+
 function applyAge(ageKey) {
     const group = AGE_GROUP_MAP[ageKey] || 'age-mid';
     currentAgeGroup = group;
@@ -27,6 +35,24 @@ function applyAge(ageKey) {
         p.classList.toggle('active-age', p.dataset.age === ageKey);
     });
     localStorage.setItem('selectedAge', ageKey);
+
+    // Auto-set AI difficulty for both games based on age (only if not manually overridden this session)
+    const defaultDiff = AGE_AI_DIFFICULTY[group] || 'medium';
+    // TTT difficulty
+    const tttSel = document.getElementById('difficulty-select');
+    if (tttSel) {
+        tttSel.value = defaultDiff;
+        // Update in-memory value and localStorage
+        if (typeof aiDifficulty !== 'undefined') aiDifficulty = defaultDiff;
+        localStorage.setItem('aiDifficulty', defaultDiff);
+    }
+    // SNL difficulty
+    const snlSel = document.getElementById('snl-difficulty-select');
+    if (snlSel) {
+        snlSel.value = defaultDiff;
+        localStorage.setItem('snlAiDifficulty', defaultDiff);
+        if (typeof snlGame !== 'undefined' && snlGame) snlGame.aiDifficulty = defaultDiff;
+    }
 }
 
 function getStepDelay() {
@@ -405,6 +431,9 @@ class CreaturesGame {
                 if (sq === 100) cell.classList.add('snl-cell-finish');
                 if (getSNLHazards()[sq])  cell.classList.add('snl-cell-hazard-head');
                 if (getSNLLadders()[sq])  cell.classList.add('snl-cell-ladder-bot');
+                // Mark ladder destination (top) squares
+                const ladderTops = Object.values(getSNLLadders());
+                if (ladderTops.includes(sq)) cell.classList.add('snl-cell-ladder-top');
 
                 const num = document.createElement('span');
                 num.className = 'snl-cell-num';
@@ -572,6 +601,27 @@ class CreaturesGame {
         });
     }
 
+    _showGhostToken(playerIdx, targetSquare) {
+        this._clearGhostToken();
+        const layer = document.getElementById('snl-tokens');
+        if (!layer) return;
+        const ghost = document.createElement('div');
+        ghost.className = `snl-ghost-token ${TOKEN_CLASSES[playerIdx]}`;
+        ghost.id = 'snl-ghost-token';
+        ghost.style.opacity = '0.45';
+        const { row, col } = squareToPos(targetSquare);
+        const offset = (playerIdx * 2.2) % 6 - 3;
+        ghost.style.left = `${col * 10 + 5 + (playerIdx % 2 === 0 ? offset : -offset)}%`;
+        ghost.style.top  = `${row * 10 + 5 + (playerIdx < 2 ? -2 : 2)}%`;
+        ghost.textContent = `P${playerIdx + 1}`;
+        layer.appendChild(ghost);
+    }
+
+    _clearGhostToken() {
+        const existing = document.getElementById('snl-ghost-token');
+        if (existing) existing.remove();
+    }
+
     updatePlayersPanel() {
         const panel = document.getElementById('snl-players-status');
         panel.innerHTML = '';
@@ -652,6 +702,11 @@ class CreaturesGame {
             this._nextTurn();
             return;
         }
+
+        // Show ghost/shadow token at destination before movement begins
+        this._showGhostToken(this.currentIdx, newPos);
+        await this._sleep(700);
+        this._clearGhostToken();
 
         // Step-by-step movement
         const from = player.position;
