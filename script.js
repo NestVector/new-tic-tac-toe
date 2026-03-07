@@ -1378,13 +1378,19 @@ class MakeoverGame {
         this.toeColors     = new Array(10).fill(null);
         this.faceColors    = {};
         this.skinTone      = '#fcd9b6';
+        this.hairColor     = '#8B4513';
+        this.nailArt       = 'plain';
         this.earringStyle  = 'none';
         this.sunglassStyle = 'off';
         this.hatStyle      = 'none';
+        this.frecklesStyle = 'off';
+        this.necklaceStyle = 'none';
 
         this._skinTones = ['#fcd9b6','#f4b88a','#c68642','#8d5524','#4a2912'];
 
+        this._initNailClips();
         this._buildPalette();
+        this._bindNailArt();
         this._bindNails();
         this._bindToes();
         this._bindFaceParts();
@@ -1399,7 +1405,8 @@ class MakeoverGame {
             '#ff6eb4','#ff9ed2','#c77dff','#a0c4ff',
             '#ffd166','#ff6b6b','#06d6a0','#f4a261',
             '#e63946','#ffffff','#ffb3c6','#b5ead7',
-            '#f9c74f','#90e0ef','#a8dadc','#e63b7a'
+            '#f9c74f','#90e0ef','#a8dadc','#e63b7a',
+            '#1e293b','#8B4513','#7c3aed','#10b981'
         ];
     }
 
@@ -1418,6 +1425,52 @@ class MakeoverGame {
                     s.classList.toggle('active', s === btn));
             });
             container.appendChild(btn);
+        });
+    }
+
+    /* ── Nail clip paths (for nail art overlays) ─────── */
+    _initNailClips() {
+        const svgNS = 'http://www.w3.org/2000/svg';
+        [['mkv-nails-svg', '.mkv-nail', 'nail', 'data-nail'],
+         ['mkv-toes-svg',  '.mkv-toe',  'toe',  'data-toe' ]].forEach(([svgId, sel, prefix, attr]) => {
+            const svg = document.getElementById(svgId);
+            let defs = svg.querySelector('defs');
+            if (!defs) {
+                defs = document.createElementNS(svgNS, 'defs');
+                svg.insertBefore(defs, svg.firstChild);
+            }
+            svg.querySelectorAll(sel).forEach(el => {
+                const idx = el.getAttribute(attr.replace('data-', ''));
+                const cp  = document.createElementNS(svgNS, 'clipPath');
+                cp.id     = `mkv-${prefix}-clip-${idx}`;
+                const shape = el.cloneNode();
+                shape.removeAttribute('class');
+                shape.removeAttribute(attr);
+                cp.appendChild(shape);
+                defs.appendChild(cp);
+            });
+        });
+    }
+
+    /* ── Nail art picker ─────────────────────────────── */
+    _bindNailArt() {
+        document.querySelectorAll('.mkv-art-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.nailArt = btn.dataset.art;
+                document.querySelectorAll('.mkv-art-btn').forEach(b =>
+                    b.classList.toggle('active', b === btn));
+                // Re-render art on already-painted nails/toes
+                const nSvg = document.getElementById('mkv-nails-svg');
+                const tSvg = document.getElementById('mkv-toes-svg');
+                document.querySelectorAll('.mkv-nail').forEach((nail, i) => {
+                    if (this.nailColors[i]) this._renderNailArt(nSvg, nail, i, this.nailColors[i], 'nail');
+                    else nSvg.getElementById(`mkv-nail-ov-${i}`)?.remove();
+                });
+                document.querySelectorAll('.mkv-toe').forEach((toe, i) => {
+                    if (this.toeColors[i]) this._renderNailArt(tSvg, toe, i, this.toeColors[i], 'toe');
+                    else tSvg.getElementById(`mkv-toe-ov-${i}`)?.remove();
+                });
+            });
         });
     }
 
@@ -1442,7 +1495,6 @@ class MakeoverGame {
         if (el('mkv-face-base'))  el('mkv-face-base').setAttribute('fill', t);
         if (el('mkv-face-cover')) el('mkv-face-cover').setAttribute('fill', t);
         if (el('mkv-neck'))       el('mkv-neck').setAttribute('fill', t);
-        // Also update nails/toes that are unpainted
         document.querySelectorAll('.mkv-nail').forEach((nail, i) => {
             if (!this.nailColors[i]) nail.setAttribute('fill', '#f3f4f6');
         });
@@ -1453,12 +1505,14 @@ class MakeoverGame {
 
     /* ── Nails ───────────────────────────────────────── */
     _bindNails() {
+        const svg = document.getElementById('mkv-nails-svg');
         document.querySelectorAll('.mkv-nail').forEach(nail => {
             nail.addEventListener('click', () => {
                 const idx = parseInt(nail.dataset.nail, 10);
                 this.nailColors[idx] = this.selectedColor;
                 nail.setAttribute('fill', this.selectedColor);
                 nail.setAttribute('stroke', this._darken(this.selectedColor));
+                this._renderNailArt(svg, nail, idx, this.selectedColor, 'nail');
                 this._sparkle(nail);
                 this._playPaint();
             });
@@ -1467,16 +1521,79 @@ class MakeoverGame {
 
     /* ── Toes ────────────────────────────────────────── */
     _bindToes() {
+        const svg = document.getElementById('mkv-toes-svg');
         document.querySelectorAll('.mkv-toe').forEach(toe => {
             toe.addEventListener('click', () => {
                 const idx = parseInt(toe.dataset.toe, 10);
                 this.toeColors[idx] = this.selectedColor;
                 toe.setAttribute('fill', this.selectedColor);
                 toe.setAttribute('stroke', this._darken(this.selectedColor));
+                this._renderNailArt(svg, toe, idx, this.selectedColor, 'toe');
                 this._sparkle(toe);
                 this._playPaint();
             });
         });
+    }
+
+    /* ── Nail art overlay renderer ───────────────────── */
+    _renderNailArt(svgEl, el, idx, color, prefix) {
+        const svgNS = 'http://www.w3.org/2000/svg';
+        const ovId  = `mkv-${prefix}-ov-${idx}`;
+        svgEl.getElementById(ovId)?.remove();
+        if (this.nailArt === 'plain') return;
+
+        const x = parseFloat(el.getAttribute('x'));
+        const y = parseFloat(el.getAttribute('y'));
+        const w = parseFloat(el.getAttribute('width'));
+        const h = parseFloat(el.getAttribute('height'));
+
+        const g = document.createElementNS(svgNS, 'g');
+        g.id = ovId;
+        g.setAttribute('clip-path', `url(#mkv-${prefix}-clip-${idx})`);
+        g.setAttribute('pointer-events', 'none');
+
+        const mk = (tag, attrs) => {
+            const node = document.createElementNS(svgNS, tag);
+            Object.entries(attrs).forEach(([k, v]) => node.setAttribute(k, v));
+            return node;
+        };
+
+        if (this.nailArt === 'french') {
+            g.appendChild(mk('rect', {x, y, width: w, height: h * 0.28, fill: 'white', opacity: '0.88'}));
+        } else if (this.nailArt === 'glitter') {
+            for (let i = 0; i < 9; i++) {
+                g.appendChild(mk('circle', {
+                    cx: x + 2 + Math.random() * (w - 4),
+                    cy: y + 2 + Math.random() * (h - 4),
+                    r:  1 + Math.random() * 1.5,
+                    fill: 'white', opacity: String(0.45 + Math.random() * 0.5)
+                }));
+            }
+        } else if (this.nailArt === 'stripes') {
+            for (let i = 0; i < 4; i++) {
+                g.appendChild(mk('rect', {x, y: y + i * (h / 4), width: w, height: h / 8, fill: 'white', opacity: '0.38'}));
+            }
+        } else if (this.nailArt === 'dots') {
+            [[0.25,0.25],[0.75,0.25],[0.5,0.5],[0.25,0.75],[0.75,0.75]].forEach(([px, py]) => {
+                g.appendChild(mk('circle', {cx: x + w * px, cy: y + h * py, r: Math.min(w, h) * 0.09, fill: 'white', opacity: '0.75'}));
+            });
+        } else if (this.nailArt === 'hearts') {
+            const cx = x + w / 2, cy = y + h * 0.48, s = Math.min(w, h) * 0.22;
+            g.appendChild(mk('path', {
+                d: `M${cx},${cy+s*0.4} C${cx-s*1.1},${cy-s*0.3} ${cx-s*1.9},${cy+s*0.5} ${cx},${cy+s*1.8} C${cx+s*1.9},${cy+s*0.5} ${cx+s*1.1},${cy-s*0.3} ${cx},${cy+s*0.4}Z`,
+                fill: 'white', opacity: '0.82'
+            }));
+        } else if (this.nailArt === 'stars') {
+            const cx = x + w / 2, cy = y + h * 0.5, r1 = Math.min(w, h) * 0.26, r2 = r1 * 0.44;
+            const pts = Array.from({length: 10}, (_, i) => {
+                const r = i % 2 === 0 ? r1 : r2;
+                const a = (i * Math.PI / 5) - Math.PI / 2;
+                return `${cx + r * Math.cos(a)},${cy + r * Math.sin(a)}`;
+            }).join(' ');
+            g.appendChild(mk('polygon', {points: pts, fill: 'white', opacity: '0.84'}));
+        }
+
+        svgEl.appendChild(g);
     }
 
     /* ── Face parts (makeup) ─────────────────────────── */
@@ -1495,8 +1612,10 @@ class MakeoverGame {
                 } else if (p === 'lips') {
                     this.faceColors[p] = this.selectedColor;
                     part.setAttribute('fill', this.selectedColor);
+                } else if (p === 'hair') {
+                    this.hairColor = this.selectedColor;
+                    part.setAttribute('fill', this.selectedColor);
                 } else if (p === 'earring-l' || p === 'earring-r') {
-                    // Clicking an earring spot applies current earring style in current color
                     if (this.earringStyle !== 'none') {
                         this.faceColors[p] = this.selectedColor;
                         this._renderEarrings();
@@ -1514,7 +1633,6 @@ class MakeoverGame {
             btn.addEventListener('click', () => {
                 const acc   = btn.dataset.acc;
                 const style = btn.dataset.style;
-                // Deactivate siblings
                 document.querySelectorAll(`.mkv-acc-btn[data-acc="${acc}"]`).forEach(b =>
                     b.classList.toggle('active', b === btn));
 
@@ -1527,6 +1645,12 @@ class MakeoverGame {
                 } else if (acc === 'hat') {
                     this.hatStyle = style;
                     this._renderHat();
+                } else if (acc === 'freckles') {
+                    this.frecklesStyle = style;
+                    this._renderFreckles();
+                } else if (acc === 'necklace') {
+                    this.necklaceStyle = style;
+                    this._renderNecklace();
                 }
                 this._playPaint();
             });
@@ -1684,6 +1808,61 @@ class MakeoverGame {
         }
     }
 
+    /* ── Freckles ────────────────────────────────────── */
+    _renderFreckles() {
+        const svgNS = 'http://www.w3.org/2000/svg';
+        const g = document.getElementById('mkv-freckles-group');
+        g.innerHTML = '';
+        if (this.frecklesStyle === 'off') return;
+
+        const allPos = [
+            [36,118],[44,113],[40,126],[50,122],[34,131],
+            [46,136],[54,116],[37,138],[50,130],[42,142],
+            [164,118],[156,113],[160,126],[150,122],[166,131],
+            [154,136],[146,116],[163,138],[150,130],[158,142]
+        ];
+        const count = this.frecklesStyle === 'more' ? 20 : 10;
+        allPos.slice(0, count).forEach(([cx, cy]) => {
+            const c = document.createElementNS(svgNS, 'circle');
+            c.setAttribute('cx', cx); c.setAttribute('cy', cy);
+            c.setAttribute('r', '2.2');
+            c.setAttribute('fill', '#b97c5d');
+            c.setAttribute('opacity', '0.52');
+            g.appendChild(c);
+        });
+    }
+
+    /* ── Necklace ────────────────────────────────────── */
+    _renderNecklace() {
+        const svgNS = 'http://www.w3.org/2000/svg';
+        const g = document.getElementById('mkv-necklace-group');
+        g.innerHTML = '';
+        if (this.necklaceStyle === 'none') return;
+
+        const color = this.selectedColor;
+        const mk = (tag, attrs) => {
+            const node = document.createElementNS(svgNS, tag);
+            Object.entries(attrs).forEach(([k, v]) => node.setAttribute(k, v));
+            return node;
+        };
+
+        if (this.necklaceStyle === 'simple') {
+            g.appendChild(mk('path', {d: 'M62,196 Q100,216 138,196', fill: 'none', stroke: color, 'stroke-width': '3', 'stroke-linecap': 'round'}));
+        } else if (this.necklaceStyle === 'pearl') {
+            g.appendChild(mk('path', {d: 'M62,196 Q100,216 138,196', fill: 'none', stroke: '#e2e8f0', 'stroke-width': '1'}));
+            for (let i = 0; i <= 8; i++) {
+                const t = i / 8;
+                const px = 62 + 76 * t;
+                const py = 196 + 20 * 4 * t * (1 - t);
+                g.appendChild(mk('circle', {cx: px, cy: py, r: '4.5', fill: '#f1f5f9', stroke: '#94a3b8', 'stroke-width': '0.8'}));
+            }
+        } else if (this.necklaceStyle === 'gem') {
+            g.appendChild(mk('path', {d: 'M66,195 Q100,212 134,195', fill: 'none', stroke: color, 'stroke-width': '2', 'stroke-linecap': 'round'}));
+            g.appendChild(mk('polygon', {points: '100,209 108,215 100,221 92,215', fill: color, stroke: 'white', 'stroke-width': '1'}));
+            g.appendChild(mk('line', {x1: '97', y1: '213', x2: '100', y2: '210', stroke: 'white', 'stroke-width': '1.2', 'stroke-linecap': 'round'}));
+        }
+    }
+
     /* ── Sparkle + sound helpers ─────────────────────── */
     _sparkle(el) {
         el.classList.add('mkv-sparkle-pop');
@@ -1723,21 +1902,30 @@ class MakeoverGame {
         this.nailColors    = new Array(10).fill(null);
         this.toeColors     = new Array(10).fill(null);
         this.faceColors    = {};
+        this.nailArt       = 'plain';
         this.earringStyle  = 'none';
         this.sunglassStyle = 'off';
         this.hatStyle      = 'none';
+        this.frecklesStyle = 'off';
+        this.necklaceStyle = 'none';
+        this.hairColor     = '#8B4513';
 
-        // Reset nail colors
-        document.querySelectorAll('.mkv-nail').forEach(n => {
+        // Reset nail + toe colors and art overlays
+        const nSvg = document.getElementById('mkv-nails-svg');
+        const tSvg = document.getElementById('mkv-toes-svg');
+        document.querySelectorAll('.mkv-nail').forEach((n, i) => {
             n.setAttribute('fill', '#f3f4f6');
             n.setAttribute('stroke', '#d1d5db');
+            nSvg.getElementById(`mkv-nail-ov-${i}`)?.remove();
         });
-        document.querySelectorAll('.mkv-toe').forEach(t => {
+        document.querySelectorAll('.mkv-toe').forEach((t, i) => {
             t.setAttribute('fill', '#f3f4f6');
             t.setAttribute('stroke', '#d1d5db');
+            tSvg.getElementById(`mkv-toe-ov-${i}`)?.remove();
         });
 
         // Reset face parts
+        document.getElementById('mkv-hair').setAttribute('fill', '#8B4513');
         document.getElementById('mkv-blush-l').setAttribute('fill', '#ffb3c6');
         document.getElementById('mkv-blush-l').setAttribute('opacity', '0.5');
         document.getElementById('mkv-blush-r').setAttribute('fill', '#ffb3c6');
@@ -1749,12 +1937,15 @@ class MakeoverGame {
         // Reset accessories
         document.getElementById('mkv-sunglasses').setAttribute('display', 'none');
         document.getElementById('mkv-hat').setAttribute('display', 'none');
-        const svg = document.getElementById('mkv-face-svg');
-        svg.querySelectorAll('.mkv-earring-render, .mkv-hat-custom').forEach(el => el.remove());
+        document.getElementById('mkv-freckles-group').innerHTML = '';
+        document.getElementById('mkv-necklace-group').innerHTML = '';
+        document.getElementById('mkv-face-svg').querySelectorAll('.mkv-earring-render, .mkv-hat-custom').forEach(el => el.remove());
 
-        // Reset accessory buttons
+        // Reset all picker buttons
         document.querySelectorAll('.mkv-acc-btn').forEach(btn =>
             btn.classList.toggle('active', btn.dataset.style === 'none' || btn.dataset.style === 'off'));
+        document.querySelectorAll('.mkv-art-btn').forEach(btn =>
+            btn.classList.toggle('active', btn.dataset.art === 'plain'));
 
         // Hide celebration
         document.getElementById('mkv-celebration').classList.add('hidden');

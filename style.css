@@ -1573,6 +1573,40 @@ body.dark-mode .mkv-acc-btn.active {
     animation: mkv-sparkle-pop 0.45s ease-out;
 }
 
+/* ── Nail art buttons ──────────────────────────────── */
+#mkv-nail-art {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 7px;
+}
+.mkv-art-btn {
+    padding: 6px 13px;
+    border-radius: 999px;
+    border: 2px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, transform 0.1s;
+    white-space: nowrap;
+}
+.mkv-art-btn:hover {
+    border-color: #ec4899;
+    transform: scale(1.06);
+}
+.mkv-art-btn.active {
+    border-color: #ec4899;
+    background: #fce7f3;
+    color: #be185d;
+    box-shadow: 0 0 0 2px #f9a8d4;
+}
+body.dark-mode .mkv-art-btn.active {
+    background: #4a0d2e;
+    color: #f9a8d4;
+}
+
 /* ── Action buttons ────────────────────────────────── */
 .mkv-actions {
     display: flex;

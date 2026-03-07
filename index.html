@@ -106,6 +106,20 @@
           <div id="mkv-palette" role="group" aria-label="Pick a colour"></div>
         </div>
 
+        <!-- Nail art style -->
+        <div class="mkv-row">
+          <h2 class="mkv-row-label">💅 Nail Art:</h2>
+          <div id="mkv-nail-art" role="group" aria-label="Nail art style">
+            <button class="mkv-art-btn active" data-art="plain">Plain</button>
+            <button class="mkv-art-btn" data-art="french">French</button>
+            <button class="mkv-art-btn" data-art="glitter">✨ Glitter</button>
+            <button class="mkv-art-btn" data-art="stripes">▤ Stripes</button>
+            <button class="mkv-art-btn" data-art="dots">⬤ Dots</button>
+            <button class="mkv-art-btn" data-art="hearts">❤ Hearts</button>
+            <button class="mkv-art-btn" data-art="stars">⭐ Stars</button>
+          </div>
+        </div>
+
         <!-- Four sections grid -->
         <div id="mkv-sections">
 
@@ -161,8 +175,8 @@
               <rect x="82" y="188" width="36" height="38" rx="8" fill="#fcd9b6" id="mkv-neck"/>
               <!-- Face skin base -->
               <ellipse cx="100" cy="112" rx="80" ry="90" fill="#fcd9b6" id="mkv-face-base"/>
-              <!-- Hair -->
-              <ellipse cx="100" cy="52" rx="82" ry="46" fill="#8B4513" id="mkv-hair"/>
+              <!-- Hair (interactive – click to change colour) -->
+              <ellipse class="mkv-face-part" data-part="hair" cx="100" cy="52" rx="82" ry="46" fill="#8B4513" id="mkv-hair"/>
               <!-- Forehead cover (to show hair only above face) -->
               <ellipse cx="100" cy="112" rx="80" ry="90" fill="#fcd9b6" id="mkv-face-cover"/>
 
@@ -200,6 +214,12 @@
               <!-- Earring spots (interactive) -->
               <circle class="mkv-face-part" data-part="earring-l" cx="18" cy="130" r="10" fill="transparent" stroke="#d1d5db" stroke-width="1.5" stroke-dasharray="3 2" id="mkv-earring-l"/>
               <circle class="mkv-face-part" data-part="earring-r" cx="182" cy="130" r="10" fill="transparent" stroke="#d1d5db" stroke-width="1.5" stroke-dasharray="3 2" id="mkv-earring-r"/>
+
+              <!-- Freckles (populated by JS) -->
+              <g id="mkv-freckles-group" aria-hidden="true"></g>
+
+              <!-- Necklace (populated by JS) -->
+              <g id="mkv-necklace-group" aria-hidden="true"></g>
 
               <!-- Sunglasses (hidden by default) -->
               <g id="mkv-sunglasses" display="none">
@@ -261,6 +281,27 @@
                   <button class="mkv-acc-btn"        data-acc="hat" data-style="cap"     title="Baseball cap">🧢</button>
                   <button class="mkv-acc-btn"        data-acc="hat" data-style="witch"   title="Witch hat">🎩</button>
                   <button class="mkv-acc-btn"        data-acc="hat" data-style="bow"     title="Hair bow">🎀</button>
+                </div>
+              </div>
+
+              <!-- Freckles -->
+              <div class="mkv-accessory-row">
+                <span class="mkv-accessory-label">Freckles:</span>
+                <div class="mkv-accessory-btns" role="group" aria-label="Freckles">
+                  <button class="mkv-acc-btn active" data-acc="freckles" data-style="off"  title="No freckles">✕</button>
+                  <button class="mkv-acc-btn"        data-acc="freckles" data-style="few"  title="A few freckles">· Few</button>
+                  <button class="mkv-acc-btn"        data-acc="freckles" data-style="more" title="More freckles">•• More</button>
+                </div>
+              </div>
+
+              <!-- Necklace -->
+              <div class="mkv-accessory-row">
+                <span class="mkv-accessory-label">Necklace:</span>
+                <div class="mkv-accessory-btns" role="group" aria-label="Necklace style">
+                  <button class="mkv-acc-btn active" data-acc="necklace" data-style="none"   title="No necklace">✕</button>
+                  <button class="mkv-acc-btn"        data-acc="necklace" data-style="simple" title="Simple chain">— Chain</button>
+                  <button class="mkv-acc-btn"        data-acc="necklace" data-style="pearl"  title="Pearl strand">○ Pearls</button>
+                  <button class="mkv-acc-btn"        data-acc="necklace" data-style="gem"    title="Gem pendant">💎 Gem</button>
                 </div>
               </div>
 
