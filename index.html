@@ -2,278 +2,191 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>ELRS Handset — Quad Drone Controller</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎮 Kids Game Zone</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
-    <!-- Top status bar -->
-    <header class="status-bar">
-        <div class="status-left">
-            <span class="brand">ELRS</span>
-            <span class="fw-version">v3.4.0</span>
+
+<!-- Full-screen confetti overlay -->
+<div id="confetti-container" aria-hidden="true"></div>
+
+<!-- Tab Navigation -->
+<nav id="tab-bar">
+    <button class="tab-btn active" data-tab="snl" id="tab-snl">🎲 <span id="tab-snl-label">Creatures &amp; Ladders</span></button>
+    <button class="tab-btn" data-tab="ttt" id="tab-ttt">❌ Tic-Tac-Toe</button>
+</nav>
+
+<main id="main-content">
+
+    <!-- CREATURES & LADDERS PANEL -->
+    <div id="snl-panel" class="tab-panel">
+
+        <!-- Setup Screen -->
+        <div id="snl-setup">
+            <h1 class="kids-title" id="snl-main-title">🎲 Creatures &amp; Ladders</h1>
+
+            <div class="setup-card">
+                <h2 class="setup-heading">Choose the hazard! 🎯</h2>
+                <div id="animal-options" role="group" aria-label="Hazard animal">
+                    <button class="animal-btn active" data-animal="frog" aria-pressed="true">🐸<br><span>Frogs</span></button>
+                    <button class="animal-btn" data-animal="snake" aria-pressed="false">🐍<br><span>Snakes</span></button>
+                    <button class="animal-btn" data-animal="dino" aria-pressed="false">🦕<br><span>Dinos</span></button>
+                    <button class="animal-btn" data-animal="fox" aria-pressed="false">🦊<br><span>Foxes</span></button>
+                    <button class="animal-btn" data-animal="croc" aria-pressed="false">🐊<br><span>Crocs</span></button>
+                </div>
+            </div>
+
+            <div class="setup-card">
+                <h2 class="setup-heading">How many players? 👥</h2>
+                <div id="player-count-selector" role="group" aria-label="Player count">
+                    <button class="count-btn" data-count="2" aria-pressed="false">2</button>
+                    <button class="count-btn active" data-count="3" aria-pressed="true">3</button>
+                    <button class="count-btn" data-count="4" aria-pressed="false">4</button>
+                </div>
+            </div>
+
+            <div class="setup-card">
+                <h2 class="setup-heading">Player Names 📝</h2>
+                <div id="snl-player-configs"></div>
+            </div>
+
+            <button id="snl-start-btn" class="big-btn">🚀 Let's Play!</button>
         </div>
-        <div class="status-center">
-            <div class="link-indicator" id="link-indicator">
-                <span class="link-dot" id="link-dot"></span>
-                <span id="link-label">NO LINK</span>
+
+        <!-- Game Screen -->
+        <div id="snl-game-screen" class="hidden">
+
+            <div id="snl-game-header">
+                <h2 id="snl-turn-display">Player 1's Turn!</h2>
+                <p id="snl-message" aria-live="polite"></p>
             </div>
+
+            <div id="snl-board-container" aria-label="Game board">
+                <div id="snl-board"></div>
+                <svg id="snl-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
+                <div id="snl-tokens" aria-hidden="true"></div>
+            </div>
+
+            <div id="snl-dice-section">
+                <div id="snl-dice" role="img" aria-label="Dice">⚀</div>
+                <button id="snl-roll-btn" class="big-btn">🎲 Roll!</button>
+            </div>
+
+            <div id="snl-players-status"></div>
+
+            <button id="snl-back-btn" class="secondary-btn">← New Setup</button>
         </div>
-        <div class="status-right">
-            <span class="rssi-label">RSSI</span>
-            <span id="rssi-val">—</span>
-            <span class="tx-pwr-label">PWR</span>
-            <span id="tx-pwr">250mW</span>
-        </div>
-    </header>
+    </div>
 
-    <main class="handset-body">
+    <!-- TIC-TAC-TOE PANEL -->
+    <div id="ttt-panel" class="tab-panel hidden">
+        <div id="game">
+            <div class="top-bar">
+                <button id="mp-btn">Multiplayer</button>
+                <button id="mode">Switch to AI Mode</button>
+                <button id="settings-btn">Settings</button>
+            </div>
 
-        <!-- LEFT SIDE: Throttle/Yaw stick + aux switches -->
-        <section class="side-panel left-panel">
-            <div class="stick-labels">
-                <span class="stick-axis-label top-label">THROTTLE</span>
-            </div>
-            <div class="stick-zone" id="left-stick-zone">
-                <div class="stick-crosshair" id="left-crosshair"></div>
-                <div class="stick-thumb" id="left-thumb"></div>
-                <div class="stick-axis-label left-label">YAW L</div>
-                <div class="stick-axis-label right-label">YAW R</div>
-                <div class="stick-axis-label bottom-label">MIN</div>
-            </div>
-            <div class="channel-mini">
-                <div class="ch-mini-item">
-                    <span class="ch-mini-name">CH3</span>
-                    <div class="ch-mini-bar"><div class="ch-mini-fill" id="ch3-mini"></div></div>
-                    <span class="ch-mini-val" id="ch3-mini-val">1000</span>
-                </div>
-                <div class="ch-mini-item">
-                    <span class="ch-mini-name">CH4</span>
-                    <div class="ch-mini-bar"><div class="ch-mini-fill" id="ch4-mini"></div></div>
-                    <span class="ch-mini-val" id="ch4-mini-val">1500</span>
-                </div>
-            </div>
-            <!-- Left aux switches -->
-            <div class="aux-switches">
-                <div class="switch-group">
-                    <label class="sw-label">ARM</label>
-                    <div class="toggle-switch" id="sw-arm" data-channel="5" data-state="0">
-                        <div class="sw-track">
-                            <div class="sw-knob"></div>
-                        </div>
-                        <span class="sw-state-label" id="sw-arm-label">DISARMED</span>
-                    </div>
-                </div>
-                <div class="switch-group">
-                    <label class="sw-label">BEEPER</label>
-                    <div class="toggle-switch" id="sw-beeper" data-channel="7" data-state="0">
-                        <div class="sw-track">
-                            <div class="sw-knob"></div>
-                        </div>
-                        <span class="sw-state-label" id="sw-beeper-label">OFF</span>
-                    </div>
-                </div>
-            </div>
-        </section>
+            <h1 class="game-title">Tic Tac Toe</h1>
 
-        <!-- CENTER PANEL -->
-        <section class="center-panel">
-            <!-- Drone attitude indicator -->
-            <div class="attitude-panel">
-                <div class="attitude-title">ATTITUDE</div>
-                <div class="horizon-container">
-                    <div class="artificial-horizon" id="artificial-horizon">
-                        <div class="horizon-sky"></div>
-                        <div class="horizon-ground"></div>
-                        <div class="horizon-line"></div>
-                        <div class="roll-indicator">
-                            <div class="roll-arc"></div>
-                            <div class="roll-pointer" id="roll-pointer"></div>
-                        </div>
-                    </div>
-                    <div class="pitch-ladder" id="pitch-ladder">
-                        <div class="pitch-mark" style="top:20%"><span>+10</span><div class="pm-line"></div></div>
-                        <div class="pitch-mark" style="top:35%"><span>+5</span><div class="pm-line pm-short"></div></div>
-                        <div class="pitch-mark center-mark" style="top:50%"><div class="pm-line"></div></div>
-                        <div class="pitch-mark" style="top:65%"><span>-5</span><div class="pm-line pm-short"></div></div>
-                        <div class="pitch-mark" style="top:80%"><span>-10</span><div class="pm-line"></div></div>
-                    </div>
-                    <div class="horizon-overlay">
-                        <div class="reticle"></div>
-                        <div class="reticle-wing left-wing"></div>
-                        <div class="reticle-wing right-wing"></div>
-                    </div>
+            <div class="scoreboard">
+                <div class="score-item score-x">
+                    <span class="score-label" id="score-label-x">Player X</span>
+                    <span class="score-value" id="score-x">0</span>
                 </div>
-                <div class="attitude-values">
-                    <div class="att-val-item">
-                        <span class="att-label">ROLL</span>
-                        <span class="att-value" id="roll-val">0.0°</span>
-                    </div>
-                    <div class="att-val-item">
-                        <span class="att-label">PITCH</span>
-                        <span class="att-value" id="pitch-val">0.0°</span>
-                    </div>
+                <div class="score-item score-draw">
+                    <span class="score-label">Draws</span>
+                    <span class="score-value" id="score-draw">0</span>
+                </div>
+                <div class="score-item score-o">
+                    <span class="score-label" id="score-label-o">Player O</span>
+                    <span class="score-value" id="score-o">0</span>
                 </div>
             </div>
 
-            <!-- Telemetry row -->
-            <div class="telemetry-row">
-                <div class="telem-item">
-                    <div class="telem-icon batt-icon">&#9889;</div>
-                    <div class="telem-data">
-                        <span class="telem-val" id="batt-val">—</span>
-                        <span class="telem-unit">V</span>
-                    </div>
-                    <div class="telem-label">BATT</div>
-                    <div class="batt-bar"><div class="batt-fill" id="batt-fill"></div></div>
-                </div>
-                <div class="telem-item">
-                    <div class="telem-icon">&#8657;</div>
-                    <div class="telem-data">
-                        <span class="telem-val" id="alt-val">—</span>
-                        <span class="telem-unit">m</span>
-                    </div>
-                    <div class="telem-label">ALT</div>
-                </div>
-                <div class="telem-item">
-                    <div class="telem-icon">&#9992;</div>
-                    <div class="telem-data">
-                        <span class="telem-val" id="speed-val">—</span>
-                        <span class="telem-unit">km/h</span>
-                    </div>
-                    <div class="telem-label">SPD</div>
-                </div>
-                <div class="telem-item">
-                    <div class="telem-icon">&#128267;</div>
-                    <div class="telem-data">
-                        <span class="telem-val" id="link-quality">—</span>
-                        <span class="telem-unit">%</span>
-                    </div>
-                    <div class="telem-label">LQ</div>
-                </div>
+            <div id="status"></div>
+
+            <div class="board" id="board">
+                <div class="cell" data-cell-index="0" tabindex="0"></div>
+                <div class="cell" data-cell-index="1" tabindex="0"></div>
+                <div class="cell" data-cell-index="2" tabindex="0"></div>
+                <div class="cell" data-cell-index="3" tabindex="0"></div>
+                <div class="cell" data-cell-index="4" tabindex="0"></div>
+                <div class="cell" data-cell-index="5" tabindex="0"></div>
+                <div class="cell" data-cell-index="6" tabindex="0"></div>
+                <div class="cell" data-cell-index="7" tabindex="0"></div>
+                <div class="cell" data-cell-index="8" tabindex="0"></div>
+                <div id="win-line" class="win-line" aria-hidden="true"></div>
             </div>
 
-            <!-- Flight mode selector -->
-            <div class="flight-mode-panel">
-                <div class="fm-title">FLIGHT MODE — CH6</div>
-                <div class="fm-buttons">
-                    <button class="fm-btn active" id="fm-acro" data-mode="ACRO" data-ch6="1000">ACRO</button>
-                    <button class="fm-btn" id="fm-angle" data-mode="ANGLE" data-ch6="1500">ANGLE</button>
-                    <button class="fm-btn" id="fm-horizon" data-mode="HORIZON" data-ch6="2000">HORIZON</button>
-                </div>
-            </div>
-
-            <!-- Bind / connect panel -->
-            <div class="bind-panel">
-                <div class="bind-row">
-                    <input type="text" id="bind-phrase" class="bind-input" placeholder="Binding phrase..." maxlength="32" autocomplete="off" spellcheck="false">
-                    <button class="bind-btn" id="bind-btn">BIND</button>
-                </div>
-                <div class="bind-status" id="bind-status">Enter binding phrase and press BIND</div>
-            </div>
-        </section>
-
-        <!-- RIGHT SIDE: Pitch/Roll stick + aux switches -->
-        <section class="side-panel right-panel">
-            <div class="stick-labels">
-                <span class="stick-axis-label top-label">PITCH FWD</span>
-            </div>
-            <div class="stick-zone" id="right-stick-zone">
-                <div class="stick-crosshair" id="right-crosshair"></div>
-                <div class="stick-thumb" id="right-thumb"></div>
-                <div class="stick-axis-label left-label">ROLL L</div>
-                <div class="stick-axis-label right-label">ROLL R</div>
-                <div class="stick-axis-label bottom-label">PITCH BACK</div>
-            </div>
-            <div class="channel-mini">
-                <div class="ch-mini-item">
-                    <span class="ch-mini-name">CH1</span>
-                    <div class="ch-mini-bar"><div class="ch-mini-fill" id="ch1-mini"></div></div>
-                    <span class="ch-mini-val" id="ch1-mini-val">1500</span>
-                </div>
-                <div class="ch-mini-item">
-                    <span class="ch-mini-name">CH2</span>
-                    <div class="ch-mini-bar"><div class="ch-mini-fill" id="ch2-mini"></div></div>
-                    <span class="ch-mini-val" id="ch2-mini-val">1500</span>
-                </div>
-            </div>
-            <!-- Right aux switches -->
-            <div class="aux-switches">
-                <div class="switch-group">
-                    <label class="sw-label">MODE</label>
-                    <div class="toggle-switch" id="sw-mode" data-channel="6" data-state="0">
-                        <div class="sw-track">
-                            <div class="sw-knob"></div>
-                        </div>
-                        <span class="sw-state-label" id="sw-mode-label">AUX 1</span>
-                    </div>
-                </div>
-                <div class="switch-group">
-                    <label class="sw-label">TURTLE</label>
-                    <div class="toggle-switch" id="sw-turtle" data-channel="8" data-state="0">
-                        <div class="sw-track">
-                            <div class="sw-knob"></div>
-                        </div>
-                        <span class="sw-state-label" id="sw-turtle-label">OFF</span>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-    </main>
-
-    <!-- Channel output bar -->
-    <footer class="channel-footer">
-        <div class="ch-bar-title">RC CHANNELS (µs)</div>
-        <div class="channel-bars" id="channel-bars">
-            <div class="ch-bar-item">
-                <div class="ch-bar-wrap"><div class="ch-bar-fill" id="ch1-bar"></div></div>
-                <span class="ch-bar-val" id="ch1-val">1500</span>
-                <span class="ch-bar-name">CH1<br>ROLL</span>
-            </div>
-            <div class="ch-bar-item">
-                <div class="ch-bar-wrap"><div class="ch-bar-fill" id="ch2-bar"></div></div>
-                <span class="ch-bar-val" id="ch2-val">1500</span>
-                <span class="ch-bar-name">CH2<br>PITCH</span>
-            </div>
-            <div class="ch-bar-item">
-                <div class="ch-bar-wrap"><div class="ch-bar-fill" id="ch3-bar"></div></div>
-                <span class="ch-bar-val" id="ch3-val">1000</span>
-                <span class="ch-bar-name">CH3<br>THRO</span>
-            </div>
-            <div class="ch-bar-item">
-                <div class="ch-bar-wrap"><div class="ch-bar-fill" id="ch4-bar"></div></div>
-                <span class="ch-bar-val" id="ch4-val">1500</span>
-                <span class="ch-bar-name">CH4<br>YAW</span>
-            </div>
-            <div class="ch-bar-item">
-                <div class="ch-bar-wrap"><div class="ch-bar-fill" id="ch5-bar"></div></div>
-                <span class="ch-bar-val" id="ch5-val">1000</span>
-                <span class="ch-bar-name">CH5<br>ARM</span>
-            </div>
-            <div class="ch-bar-item">
-                <div class="ch-bar-wrap"><div class="ch-bar-fill" id="ch6-bar"></div></div>
-                <span class="ch-bar-val" id="ch6-val">1000</span>
-                <span class="ch-bar-name">CH6<br>MODE</span>
-            </div>
-            <div class="ch-bar-item">
-                <div class="ch-bar-wrap"><div class="ch-bar-fill" id="ch7-bar"></div></div>
-                <span class="ch-bar-val" id="ch7-val">1000</span>
-                <span class="ch-bar-name">CH7<br>BEEP</span>
-            </div>
-            <div class="ch-bar-item">
-                <div class="ch-bar-wrap"><div class="ch-bar-fill" id="ch8-bar"></div></div>
-                <span class="ch-bar-val" id="ch8-val">1000</span>
-                <span class="ch-bar-name">CH8<br>TRTL</span>
+            <div class="action-bar">
+                <button id="reset">New Game</button>
+                <button id="undo" disabled>Undo</button>
+                <button id="reset-scores">Reset Scores</button>
             </div>
         </div>
-        <div class="packet-rate">
-            <span>PACKET RATE: <span id="packet-rate">500</span> Hz</span>
-            <span>LINK MODE: <span id="link-mode">D500</span></span>
-            <span>SNR: <span id="snr-val">—</span> dB</span>
-        </div>
-    </footer>
+    </div>
 
-    <script src="script.js"></script>
+</main>
+
+<!-- Multiplayer Overlay -->
+<div id="mp-overlay" class="hidden">
+    <div id="mp-panel" role="dialog" aria-modal="true" aria-labelledby="mp-heading">
+        <h2 id="mp-heading">Multiplayer</h2>
+        <div id="mp-lobby">
+            <button id="mp-create">Create Game</button>
+            <div class="mp-or">— or —</div>
+            <div class="mp-join-row">
+                <input type="text" id="mp-code-input" placeholder="Enter room code" maxlength="6" autocomplete="off">
+                <button id="mp-join">Join</button>
+            </div>
+        </div>
+        <div id="mp-waiting" class="hidden">
+            <p class="mp-label">Share this code with your opponent:</p>
+            <div class="mp-code-box">
+                <span id="mp-room-code">—</span>
+                <button id="mp-copy">Copy</button>
+            </div>
+            <p id="mp-hint" class="mp-hint-text"></p>
+        </div>
+        <p id="mp-status-text" class="mp-status"></p>
+        <button id="mp-close">Close</button>
+    </div>
+</div>
+
+<!-- Settings Overlay -->
+<div id="settings-overlay" class="hidden">
+    <div id="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-heading">
+        <h2 id="settings-heading">Settings</h2>
+        <div class="setting-row">
+            <label for="dark-mode-toggle">Dark Mode</label>
+            <label class="switch">
+                <input type="checkbox" id="dark-mode-toggle">
+                <span class="slider"></span>
+            </label>
+        </div>
+        <div class="setting-row">
+            <label for="difficulty-select">AI Difficulty</label>
+            <select id="difficulty-select">
+                <option value="easy">Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard">Hard</option>
+            </select>
+        </div>
+        <div class="setting-row name-row">
+            <label for="player-x-name">Player X Name</label>
+            <input type="text" id="player-x-name" maxlength="16" autocomplete="off">
+        </div>
+        <div class="setting-row name-row">
+            <label for="player-o-name">Player O Name</label>
+            <input type="text" id="player-o-name" maxlength="16" autocomplete="off">
+        </div>
+        <button id="settings-close">Close</button>
+    </div>
+</div>
+
+<script src="script.js"></script>
 </body>
 </html>
