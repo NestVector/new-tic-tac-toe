@@ -76,6 +76,7 @@ body {
     background-attachment: fixed;
     color: var(--text);
     height: 100vh;
+    height: 100dvh;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -1729,3 +1730,107 @@ body.age-tiny #snl-difficulty-row { display: none; }
 
 /* Multiplayer online button for S&L */
 body.age-tiny #snl-mp-open-btn { display: none; }
+
+/* ═══════════════════════════════════════════════
+   TRANSITIONS & CHROME FIXES
+═══════════════════════════════════════════════ */
+
+/* Tab panel fade-in when becoming visible */
+@keyframes panel-fade-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.tab-panel:not(.hidden) {
+    animation: panel-fade-in 0.22s ease both;
+}
+
+/* Setup / game screen slide-in transition */
+@keyframes screen-slide-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+#snl-setup:not(.hidden),
+#snl-game-screen:not(.hidden) {
+    animation: screen-slide-in 0.28s ease both;
+}
+
+/* Medium screens (tablet): 2-column game layout so Roll button is always visible */
+@media (min-width: 600px) and (max-width: 1199px) {
+    #snl-game-layout {
+        display: grid !important;
+        grid-template-columns: 1fr 210px;
+        grid-template-rows: 1fr;
+        gap: 12px;
+        overflow: hidden !important;
+    }
+    #snl-board-area {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        overflow: hidden;
+    }
+    #snl-board-container {
+        flex: 1;
+        max-width: none !important;
+        min-height: 0;
+        align-self: stretch !important;
+        width: auto !important;
+    }
+    #snl-sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        overflow-y: auto;
+        min-height: 0;
+    }
+}
+
+/* Small screens: cap board height so sidebar + Roll button stay in view */
+@media (max-width: 599px) {
+    #snl-game-layout {
+        overflow-y: auto !important;
+    }
+    #snl-board-container {
+        max-height: min(calc(100vw - 24px), calc(100svh - 330px)) !important;
+    }
+    /* Compact dice + roll button side-by-side on small screens */
+    #snl-dice-section {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    #snl-dice-3d,
+    .dice-3d-wrap {
+        width: 56px !important;
+        height: 56px !important;
+        perspective: 160px !important;
+        margin: 0 !important;
+    }
+    .dice-cube {
+        width: 56px !important;
+        height: 56px !important;
+    }
+    .dice-face {
+        width: 56px !important;
+        height: 56px !important;
+        padding: 8px !important;
+        border-radius: 10px !important;
+    }
+    .face-1 { transform: translateZ(28px) !important; }
+    .face-6 { transform: rotateY(180deg) translateZ(28px) !important; }
+    .face-2 { transform: rotateY(-90deg) translateZ(28px) !important; }
+    .face-5 { transform: rotateY(90deg) translateZ(28px) !important; }
+    .face-4 { transform: rotateX(90deg) translateZ(28px) !important; }
+    .face-3 { transform: rotateX(-90deg) translateZ(28px) !important; }
+}
+
+/* Overlay open/close transitions */
+#settings-overlay:not(.hidden),
+#mp-overlay:not(.hidden),
+.mp-overlay:not(.hidden),
+.htp-overlay:not(.hidden) {
+    animation: panel-fade-in 0.2s ease both;
+}

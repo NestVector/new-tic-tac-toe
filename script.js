@@ -685,10 +685,15 @@ class CreaturesGame {
             ? predeterminedResult
             : Math.floor(Math.random() * 6) + 1;
 
-        // Animate 3D dice
-        await rollDice3D(result);
-
-        await this._movePlayer(result);
+        try {
+            // Animate 3D dice
+            await rollDice3D(result);
+            await this._movePlayer(result);
+        } catch (err) {
+            // Reset busy so buttons always become re-enabled on any unexpected error
+            this.busy = false;
+            this.setRollBtnState();
+        }
     }
 
     async _movePlayer(steps) {
@@ -702,6 +707,12 @@ class CreaturesGame {
             this._nextTurn();
             return;
         }
+
+        // Guard: ensure busy is always reset on any error mid-movement
+        let _cleanupDone = false;
+        const _ensureCleanup = () => {
+            if (!_cleanupDone) { _cleanupDone = true; this.busy = false; this._clearGhostToken(); }
+        };
 
         // Show ghost/shadow token at destination before movement begins
         this._showGhostToken(this.currentIdx, newPos);
@@ -765,11 +776,12 @@ class CreaturesGame {
 
         // Check win after hazard/ladder
         if (player.position === 100) {
+            _ensureCleanup();
             await this._handleWin();
             return;
         }
 
-        this.busy = false;
+        _ensureCleanup();
         this._nextTurn();
     }
 
