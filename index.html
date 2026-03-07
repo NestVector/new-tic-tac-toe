@@ -5,10 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tic Tac Toe</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
     <div id="game">
         <div class="top-bar">
+            <button id="mp-btn">Multiplayer</button>
             <button id="mode">Switch to AI Mode</button>
             <button id="settings-btn">Settings</button>
         </div>
@@ -17,7 +19,7 @@
 
         <div class="scoreboard">
             <div class="score-item score-x">
-                <span class="score-label">Player X</span>
+                <span class="score-label" id="score-label-x">Player X</span>
                 <span class="score-value" id="score-x">0</span>
             </div>
             <div class="score-item score-draw">
@@ -25,7 +27,7 @@
                 <span class="score-value" id="score-draw">0</span>
             </div>
             <div class="score-item score-o">
-                <span class="score-label">Player O</span>
+                <span class="score-label" id="score-label-o">Player O</span>
                 <span class="score-value" id="score-o">0</span>
             </div>
         </div>
@@ -33,20 +35,46 @@
         <div id="status"></div>
 
         <div class="board" id="board">
-            <div class="cell" data-cell-index="0"></div>
-            <div class="cell" data-cell-index="1"></div>
-            <div class="cell" data-cell-index="2"></div>
-            <div class="cell" data-cell-index="3"></div>
-            <div class="cell" data-cell-index="4"></div>
-            <div class="cell" data-cell-index="5"></div>
-            <div class="cell" data-cell-index="6"></div>
-            <div class="cell" data-cell-index="7"></div>
-            <div class="cell" data-cell-index="8"></div>
+            <div class="cell" data-cell-index="0" tabindex="0"></div>
+            <div class="cell" data-cell-index="1" tabindex="0"></div>
+            <div class="cell" data-cell-index="2" tabindex="0"></div>
+            <div class="cell" data-cell-index="3" tabindex="0"></div>
+            <div class="cell" data-cell-index="4" tabindex="0"></div>
+            <div class="cell" data-cell-index="5" tabindex="0"></div>
+            <div class="cell" data-cell-index="6" tabindex="0"></div>
+            <div class="cell" data-cell-index="7" tabindex="0"></div>
+            <div class="cell" data-cell-index="8" tabindex="0"></div>
+            <div id="win-line" class="win-line" aria-hidden="true"></div>
         </div>
 
         <div class="action-bar">
             <button id="reset">New Game</button>
+            <button id="undo" disabled>Undo</button>
             <button id="reset-scores">Reset Scores</button>
+        </div>
+    </div>
+
+    <div id="mp-overlay" class="hidden">
+        <div id="mp-panel" role="dialog" aria-modal="true" aria-labelledby="mp-heading">
+            <h2 id="mp-heading">Multiplayer</h2>
+            <div id="mp-lobby">
+                <button id="mp-create">Create Game</button>
+                <div class="mp-or">— or —</div>
+                <div class="mp-join-row">
+                    <input type="text" id="mp-code-input" placeholder="Enter room code" maxlength="6" autocomplete="off">
+                    <button id="mp-join">Join</button>
+                </div>
+            </div>
+            <div id="mp-waiting" class="hidden">
+                <p class="mp-label">Share this code with your opponent:</p>
+                <div class="mp-code-box">
+                    <span id="mp-room-code">—</span>
+                    <button id="mp-copy">Copy</button>
+                </div>
+                <p id="mp-hint" class="mp-hint-text"></p>
+            </div>
+            <p id="mp-status-text" class="mp-status"></p>
+            <button id="mp-close">Close</button>
         </div>
     </div>
 
@@ -59,6 +87,22 @@
                     <input type="checkbox" id="dark-mode-toggle">
                     <span class="slider"></span>
                 </label>
+            </div>
+            <div class="setting-row">
+                <label for="difficulty-select">AI Difficulty</label>
+                <select id="difficulty-select">
+                    <option value="easy">Easy</option>
+                    <option value="medium">Medium</option>
+                    <option value="hard">Hard</option>
+                </select>
+            </div>
+            <div class="setting-row name-row">
+                <label for="player-x-name">Player X Name</label>
+                <input type="text" id="player-x-name" maxlength="16" autocomplete="off">
+            </div>
+            <div class="setting-row name-row">
+                <label for="player-o-name">Player O Name</label>
+                <input type="text" id="player-o-name" maxlength="16" autocomplete="off">
             </div>
             <button id="settings-close">Close</button>
         </div>
