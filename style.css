@@ -44,6 +44,10 @@ body.dark-mode {
     padding: 0;
 }
 
+.hidden {
+    display: none !important;
+}
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: var(--bg);
@@ -434,11 +438,11 @@ button:disabled:hover {
     align-items: center;
     z-index: 100;
     backdrop-filter: blur(4px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 16px;
 }
 
-#settings-overlay.hidden {
-    display: none;
-}
 
 #settings-panel {
     background: var(--surface);
@@ -570,11 +574,11 @@ button:disabled:hover {
     align-items: center;
     z-index: 100;
     backdrop-filter: blur(4px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 16px;
 }
 
-#mp-overlay.hidden {
-    display: none;
-}
 
 #mp-panel {
     background: var(--surface);
@@ -588,6 +592,7 @@ button:disabled:hover {
     display: flex;
     flex-direction: column;
     gap: 20px;
+    overflow: hidden;
 }
 
 #mp-panel h2 {
@@ -612,6 +617,10 @@ button:disabled:hover {
 .mp-join-row {
     display: flex;
     gap: 8px;
+}
+
+#mp-join {
+    flex-shrink: 0;
 }
 
 .mp-join-row input {
@@ -688,4 +697,125 @@ button:disabled:hover {
 
 #mp-close {
     width: 100%;
+}
+
+/* ---- Mobile responsiveness ---- */
+@media (max-width: 480px) {
+    body {
+        padding: 12px 8px 32px;
+    }
+
+    #game {
+        padding: 16px 14px 20px;
+        gap: 14px;
+    }
+
+    .game-title {
+        font-size: 1.4rem;
+    }
+
+    /* Top bar: wrap buttons so they don't overflow */
+    .top-bar {
+        flex-wrap: wrap;
+        gap: 6px;
+        justify-content: center;
+    }
+
+    .top-bar button {
+        font-size: 0.75rem;
+        padding: 5px 10px;
+    }
+
+    /* Scoreboard */
+    .score-item {
+        padding: 8px 4px;
+    }
+
+    .score-label {
+        font-size: 0.65rem;
+    }
+
+    .score-value {
+        font-size: 1.4rem;
+    }
+
+    /* Board cells */
+    .cell {
+        font-size: 1.8rem;
+        border-radius: 8px;
+    }
+
+    /* Action bar */
+    .action-bar {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .action-bar button {
+        font-size: 0.8rem;
+        padding: 8px 12px;
+    }
+
+    /* Multiplayer overlay: scrollable on small screens */
+    #mp-overlay {
+        align-items: flex-start;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        padding: 24px 12px;
+    }
+
+    #mp-panel {
+        padding: 20px 16px;
+        gap: 14px;
+        max-width: 100%;
+    }
+
+    /* Join row: stack vertically if too narrow */
+    .mp-join-row {
+        flex-direction: column;
+    }
+
+    .mp-join-row input {
+        width: 100%;
+    }
+
+    #mp-room-code {
+        font-size: 1.1rem;
+    }
+
+    .mp-code-box {
+        padding: 10px;
+    }
+
+    /* Settings overlay: scrollable on small screens */
+    #settings-overlay {
+        align-items: flex-start;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        padding: 24px 12px;
+    }
+
+    #settings-panel {
+        padding: 20px 16px;
+        min-width: unset;
+        width: 100%;
+        max-width: 100%;
+    }
+}
+
+/* Extra small screens (e.g. iPhone SE, 320px) */
+@media (max-width: 360px) {
+    .top-bar button {
+        font-size: 0.7rem;
+        padding: 4px 8px;
+    }
+
+    .action-bar button {
+        font-size: 0.75rem;
+        padding: 6px 8px;
+    }
+
+    #mp-panel {
+        padding: 16px 12px;
+    }
 }
