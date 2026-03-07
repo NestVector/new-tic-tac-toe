@@ -1125,3 +1125,243 @@ button:disabled:hover { transform: none; }
     #snl-turn-display { font-size: 1.05rem; }
     .snl-player-card { min-width: 86px; padding: 6px 8px; }
 }
+
+/* ═══════════════════════════════════════════════
+   IMPROVEMENTS — KIDS UX PASS
+═══════════════════════════════════════════════ */
+
+/* ── Board square numbers: much bigger and readable ── */
+.snl-cell-num {
+    font-size: clamp(8px, 1.6vw, 13px) !important;
+    font-weight: 800 !important;
+    color: #6b7280 !important;
+}
+
+/* ── Cell icons bigger ── */
+.snl-cell-icon {
+    font-size: clamp(10px, 2vw, 16px) !important;
+}
+
+/* ── Tokens larger and easier to see ── */
+.snl-token {
+    width: 9% !important;
+    height: 9% !important;
+    font-size: clamp(8px, 1.6vw, 13px) !important;
+    border: 3px solid rgba(255,255,255,0.95) !important;
+    font-weight: 900 !important;
+}
+
+/* ── Active player token: bigger glow ring ── */
+.snl-token.active-token {
+    box-shadow: 0 0 0 4px rgba(255,255,255,0.9), 0 0 0 7px rgba(255,255,255,0.45), 0 4px 14px rgba(0,0,0,0.45) !important;
+    z-index: 6 !important;
+}
+
+/* ── Current-turn player card: more visible ── */
+.snl-player-card.current-turn {
+    border-color: var(--btn-bg) !important;
+    border-width: 3px !important;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--btn-bg) 30%, transparent 70%) !important;
+    transform: translateY(-3px) scale(1.04) !important;
+    background: color-mix(in srgb, var(--btn-bg) 8%, var(--surface2) 92%) !important;
+}
+
+/* ── Animal label text bigger ── */
+.animal-btn span {
+    font-size: 0.85rem !important;
+    font-weight: 800 !important;
+}
+
+/* ── How to Play button (setup screen) ── */
+.how-to-play-btn {
+    background: none !important;
+    border: 2px solid var(--border) !important;
+    color: var(--text-muted) !important;
+    font-size: 0.9rem !important;
+    font-weight: 700 !important;
+    border-radius: 50px !important;
+    padding: 7px 18px !important;
+    cursor: pointer !important;
+    transition: border-color 0.15s, color 0.15s, transform 0.15s !important;
+    box-shadow: none !important;
+}
+.how-to-play-btn:hover {
+    border-color: var(--btn-bg) !important;
+    color: var(--btn-bg) !important;
+    transform: translateY(-2px) !important;
+    background: none !important;
+}
+
+.how-to-play-top-btn {
+    background: none !important;
+    border: none !important;
+    color: var(--text-muted) !important;
+    font-size: 1rem !important;
+    padding: 6px 8px !important;
+    cursor: pointer !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+    transition: color 0.15s, background 0.15s !important;
+}
+.how-to-play-top-btn:hover {
+    color: var(--text) !important;
+    background: var(--btn-secondary-hover) !important;
+}
+
+/* ── Mute button in tab bar ── */
+.mute-btn {
+    padding: 8px 12px !important;
+    font-size: 1.1rem !important;
+    background: rgba(255,255,255,0.2) !important;
+    border: none !important;
+    border-radius: 10px 10px 0 0 !important;
+    color: #fff !important;
+    cursor: pointer !important;
+    transition: background 0.2s, transform 0.15s !important;
+    box-shadow: none !important;
+    flex-shrink: 0 !important;
+    align-self: flex-end !important;
+}
+.mute-btn:hover {
+    background: rgba(255,255,255,0.35) !important;
+    transform: scale(1.1) !important;
+}
+.mute-btn.muted {
+    opacity: 0.55 !important;
+}
+
+/* ── How to Play overlay ── */
+.htp-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 200;
+    backdrop-filter: blur(4px);
+    padding: 16px;
+}
+.htp-overlay.hidden { display: none; }
+
+.htp-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 32px 28px 28px;
+    max-width: 480px;
+    width: 100%;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.35);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.htp-panel h2 {
+    font-size: 1.5rem;
+    font-weight: 900;
+    text-align: center;
+    color: var(--text);
+}
+
+.htp-rules {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.htp-rule {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: var(--text);
+}
+
+.htp-rule strong { color: var(--btn-bg); }
+
+.htp-close { width: 100%; }
+
+/* ── Progress bar in player card ── */
+.snl-player-progress {
+    width: 100%;
+    height: 5px;
+    background: var(--border);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-top: 3px;
+}
+
+.snl-player-progress-fill {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.4s ease;
+    background: linear-gradient(90deg, var(--kids-blue), var(--kids-purple));
+}
+
+/* Player card layout: expand to fit progress bar */
+.snl-player-card {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 6px !important;
+}
+
+.snl-player-card-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* ── Turn display: bigger and colored ── */
+#snl-turn-display {
+    font-size: 1.5rem !important;
+    font-weight: 900 !important;
+}
+
+/* ── Message text: slightly bigger ── */
+#snl-message {
+    font-size: 1rem !important;
+    font-weight: 700 !important;
+    color: var(--text) !important;
+    min-height: 24px !important;
+}
+
+/* ── Mobile: better board scaling ── */
+@media (max-width: 600px) {
+    #snl-board-container { max-width: min(92vw, 400px); }
+    .snl-cell-num { font-size: clamp(7px, 2.2vw, 11px) !important; }
+    .snl-token { width: 10% !important; height: 10% !important; }
+    .htp-panel { padding: 20px 16px; }
+    .htp-rule { font-size: 0.88rem; }
+}
+
+/* ── AI Toggle button (replaces switch) ── */
+.snl-ai-toggle {
+    padding: 7px 14px !important;
+    border: 2px solid var(--border) !important;
+    border-radius: 50px !important;
+    background: var(--surface) !important;
+    color: var(--text-muted) !important;
+    font-size: 0.82rem !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+    transition: border-color 0.15s, color 0.15s, background 0.15s, transform 0.15s !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    box-shadow: none !important;
+}
+.snl-ai-toggle:hover {
+    border-color: var(--btn-bg) !important;
+    color: var(--btn-bg) !important;
+    transform: scale(1.04) !important;
+    background: var(--surface) !important;
+}
+.snl-ai-toggle.snl-ai-toggle-on {
+    border-color: var(--kids-purple) !important;
+    background: color-mix(in srgb, var(--kids-purple) 14%, var(--surface) 86%) !important;
+    color: var(--kids-purple) !important;
+}

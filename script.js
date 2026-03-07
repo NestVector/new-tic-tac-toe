@@ -335,6 +335,28 @@ class CreaturesGame {
         const NS = 'http://www.w3.org/2000/svg';
         const animal = ANIMALS[this.animalKey];
 
+        // Define arrowhead markers
+        const defs = document.createElementNS(NS, 'defs');
+
+        const mkArrow = (id, color) => {
+            const marker = document.createElementNS(NS, 'marker');
+            marker.setAttribute('id', id);
+            marker.setAttribute('markerWidth', '5');
+            marker.setAttribute('markerHeight', '5');
+            marker.setAttribute('refX', '3');
+            marker.setAttribute('refY', '2.5');
+            marker.setAttribute('orient', 'auto');
+            const poly = document.createElementNS(NS, 'polygon');
+            poly.setAttribute('points', '0 0, 5 2.5, 0 5');
+            poly.setAttribute('fill', color);
+            poly.setAttribute('opacity', '0.85');
+            marker.appendChild(poly);
+            return marker;
+        };
+        defs.appendChild(mkArrow('arrow-ladder', '#f59e0b'));
+        defs.appendChild(mkArrow('arrow-hazard', animal.color));
+        svg.appendChild(defs);
+
         // Draw ladders
         Object.entries(SNL_LADDERS).forEach(([from, to]) => {
             const f = squareCenter(+from);
@@ -345,13 +367,14 @@ class CreaturesGame {
             const color = '#f59e0b';
 
             // Rails
-            [[nx, ny], [-nx, -ny]].forEach(([ox, oy]) => {
+            [[nx, ny], [-nx, -ny]].forEach(([ox, oy], ri) => {
                 const line = document.createElementNS(NS, 'line');
                 line.setAttribute('x1', f.x + ox); line.setAttribute('y1', f.y + oy);
                 line.setAttribute('x2', t.x + ox); line.setAttribute('y2', t.y + oy);
                 line.setAttribute('stroke', color);
                 line.setAttribute('stroke-width', '0.9');
                 line.setAttribute('stroke-linecap', 'round');
+                if (ri === 0) line.setAttribute('marker-end', 'url(#arrow-ladder)');
                 svg.appendChild(line);
             });
 
@@ -392,6 +415,7 @@ class CreaturesGame {
             path.setAttribute('fill', 'none');
             path.setAttribute('stroke-linecap', 'round');
             path.setAttribute('opacity', '0.75');
+            path.setAttribute('marker-end', 'url(#arrow-hazard)');
             svg.appendChild(path);
 
             // Emoji at head
@@ -448,11 +472,17 @@ class CreaturesGame {
             const card = document.createElement('div');
             card.className = `snl-player-card${i === this.currentIdx ? ' current-turn' : ''}`;
             if (p.won) card.classList.add('winner-card');
+            const pct = Math.min(100, Math.round(p.position));
             card.innerHTML = `
-                <div class="snl-player-dot ${TOKEN_CLASSES[i]}"></div>
-                <div class="snl-player-info">
-                    <div class="snl-player-name-display">${p.name}${p.isAI ? ' 🤖' : ''}</div>
-                    <div class="snl-player-pos-display">${p.won ? '🏆 Winner!' : (p.position === 0 ? 'Start' : `Square ${p.position}`)}</div>
+                <div class="snl-player-card-top">
+                    <div class="snl-player-dot ${TOKEN_CLASSES[i]}"></div>
+                    <div class="snl-player-info">
+                        <div class="snl-player-name-display">${p.name}${p.isAI ? ' 🤖' : ''}</div>
+                        <div class="snl-player-pos-display">${p.won ? '🏆 Winner!' : (p.position === 0 ? 'Ready to start!' : `Square ${p.position} / 100`)}</div>
+                    </div>
+                </div>
+                <div class="snl-player-progress">
+                    <div class="snl-player-progress-fill" style="width:${pct}%"></div>
                 </div>`;
             panel.appendChild(card);
         });
@@ -615,7 +645,7 @@ class CreaturesGame {
 ═══════════════════════════════════════════════════════════════ */
 let snlGame = null;
 let snlAnimal = 'frog';
-let snlPlayerCount = 3;
+let snlPlayerCount = 2;
 
 function buildPlayerConfigs(count) {
     const container = document.getElementById('snl-player-configs');
@@ -632,29 +662,21 @@ function buildPlayerConfigs(count) {
         nameInput.value = DEFAULT_NAMES[i];
         nameInput.maxLength = 14;
         nameInput.placeholder = `Player ${i + 1}`;
-        const aiLabel = document.createElement('span');
-        aiLabel.className = 'snl-ai-label';
-        aiLabel.textContent = 'Human';
-        const sw = document.createElement('label');
-        sw.className = 'switch';
-        const cb = document.createElement('input');
-        cb.type = 'checkbox';
-        cb.dataset.playerIdx = i;
-        if (i === count - 1 && count > 1) {
-            // Default last player to AI if more than 1
-            cb.checked = false; // user can choose
-        }
-        const span = document.createElement('span');
-        span.className = 'slider';
-        cb.addEventListener('change', () => {
-            aiLabel.textContent = cb.checked ? '🤖 AI' : 'Human';
+        const aiToggle = document.createElement('button');
+        aiToggle.type = 'button';
+        aiToggle.className = 'snl-ai-toggle';
+        aiToggle.dataset.isAi = 'false';
+        aiToggle.dataset.playerIdx = i;
+        aiToggle.textContent = '👤 Human';
+        aiToggle.addEventListener('click', () => {
+            const isAi = aiToggle.dataset.isAi === 'true';
+            aiToggle.dataset.isAi = String(!isAi);
+            aiToggle.textContent = !isAi ? '🤖 Computer' : '👤 Human';
+            aiToggle.classList.toggle('snl-ai-toggle-on', !isAi);
         });
-        sw.appendChild(cb);
-        sw.appendChild(span);
         row.appendChild(badge);
         row.appendChild(nameInput);
-        row.appendChild(sw);
-        row.appendChild(aiLabel);
+        row.appendChild(aiToggle);
         container.appendChild(row);
     }
 }
@@ -696,11 +718,11 @@ buildPlayerConfigs(snlPlayerCount);
 document.getElementById('snl-start-btn').addEventListener('click', () => {
     const configs = [];
     document.querySelectorAll('.snl-player-config').forEach((row, i) => {
-        const nameEl = row.querySelector('.snl-name-input');
-        const aiEl   = row.querySelector('input[type=checkbox]');
+        const nameEl    = row.querySelector('.snl-name-input');
+        const aiToggle  = row.querySelector('.snl-ai-toggle');
         configs.push({
             name: (nameEl.value.trim() || DEFAULT_NAMES[i]).slice(0, 14),
-            isAI: aiEl.checked,
+            isAI: aiToggle ? aiToggle.dataset.isAi === 'true' : false,
         });
     });
 
@@ -762,7 +784,7 @@ let moveHistory = [];
 let aiTimeoutId = null;
 let autoAdvanceIntervalId = null;
 let autoAdvanceTimeoutId = null;
-let aiDifficulty = localStorage.getItem('aiDifficulty') || 'hard';
+let aiDifficulty = localStorage.getItem('aiDifficulty') || 'easy';
 
 let multiplayerMode = false;
 let peer = null;
@@ -1292,3 +1314,55 @@ document.getElementById('mp-copy').addEventListener('click', () => {
 updateNameDisplay();
 updateScoreDisplay();
 resetGame();
+
+/* ═══════════════════════════════════════════════════════════════
+   MUTE TOGGLE
+═══════════════════════════════════════════════════════════════ */
+let _soundMuted = false;
+
+(function patchSoundEngineForMute() {
+    ['playDice','playStep','playAnimal','playLadder','playWin','playTTTMove','playTTTWin'].forEach(fn => {
+        const orig = sound[fn].bind(sound);
+        sound[fn] = function(...a) { if (!_soundMuted) orig(...a); };
+    });
+})();
+
+const muteBtn = document.getElementById('mute-btn');
+muteBtn.addEventListener('click', () => {
+    _soundMuted = !_soundMuted;
+    muteBtn.textContent = _soundMuted ? '🔇' : '🔊';
+    muteBtn.classList.toggle('muted', _soundMuted);
+    muteBtn.title = _soundMuted ? 'Sounds off — click to turn on' : 'Sounds on — click to mute';
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   HOW TO PLAY MODALS
+═══════════════════════════════════════════════════════════════ */
+function openHtp(overlayId) {
+    document.getElementById(overlayId).classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+function closeHtp(overlayId) {
+    document.getElementById(overlayId).classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+document.getElementById('snl-how-to-play-btn').addEventListener('click', () => openHtp('snl-htp-overlay'));
+document.getElementById('snl-htp-close').addEventListener('click', () => closeHtp('snl-htp-overlay'));
+document.getElementById('snl-htp-overlay').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeHtp('snl-htp-overlay');
+});
+
+document.getElementById('ttt-how-to-play-btn').addEventListener('click', () => openHtp('ttt-htp-overlay'));
+document.getElementById('ttt-htp-close').addEventListener('click', () => closeHtp('ttt-htp-overlay'));
+document.getElementById('ttt-htp-overlay').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeHtp('ttt-htp-overlay');
+});
+
+// Close HTP modals with Escape key
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        closeHtp('snl-htp-overlay');
+        closeHtp('ttt-htp-overlay');
+    }
+});
