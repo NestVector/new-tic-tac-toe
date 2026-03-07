@@ -1,478 +1,1294 @@
-/* ============================================================
-   ELRS Handset — Virtual RC Transmitter
-   Channels: CH1=Roll, CH2=Pitch, CH3=Throttle, CH4=Yaw
-             CH5=Arm, CH6=FlightMode, CH7=Beeper, CH8=Turtle
-   ============================================================ */
-
 'use strict';
 
-// ── Channel state (microseconds, 1000–2000) ──────────────────
-const CH_MIN = 1000;
-const CH_MID = 1500;
-const CH_MAX = 2000;
+/* ═══════════════════════════════════════════════════════════════
+   SOUND ENGINE  (Web Audio API)
+═══════════════════════════════════════════════════════════════ */
+class SoundEngine {
+    constructor() { this._ctx = null; }
 
-const channels = {
-    ch1: CH_MID,  // Roll
-    ch2: CH_MID,  // Pitch
-    ch3: CH_MIN,  // Throttle (starts at min)
-    ch4: CH_MID,  // Yaw
-    ch5: CH_MIN,  // Arm
-    ch6: CH_MIN,  // Flight mode
-    ch7: CH_MIN,  // Beeper
-    ch8: CH_MIN,  // Turtle mode
-};
+    get ctx() {
+        if (!this._ctx) {
+            this._ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (this._ctx.state === 'suspended') this._ctx.resume();
+        return this._ctx;
+    }
 
-// ── Link state ────────────────────────────────────────────────
-let linked = false;
-let bindPhrase = '';
+    _note(freq, type, duration, vol = 0.28, delay = 0) {
+        try {
+            const ac = this.ctx;
+            const t = ac.currentTime + delay;
+            const osc = ac.createOscillator();
+            const g   = ac.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, t);
+            g.gain.setValueAtTime(vol, t);
+            g.gain.exponentialRampToValueAtTime(0.001, t + duration);
+            osc.connect(g);
+            g.connect(ac.destination);
+            osc.start(t);
+            osc.stop(t + duration);
+        } catch (_) {}
+    }
 
-// Simulated telemetry (updated when "linked")
-let telem = {
-    battery: 0,
-    altitude: 0,
-    speed: 0,
-    lq: 0,
-    rssi: 0,
-    snr: 0,
-    roll: 0,
-    pitch: 0,
-};
+    _noise(duration, vol = 0.3, filter = null, delay = 0) {
+        try {
+            const ac = this.ctx;
+            const t  = ac.currentTime + delay;
+            const n  = Math.ceil(ac.sampleRate * duration);
+            const buf = ac.createBuffer(1, n, ac.sampleRate);
+            const d   = buf.getChannelData(0);
+            for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+            const src = ac.createBufferSource();
+            src.buffer = buf;
+            const g = ac.createGain();
+            g.gain.setValueAtTime(vol, t);
+            g.gain.exponentialRampToValueAtTime(0.001, t + duration);
+            if (filter) {
+                const f = ac.createBiquadFilter();
+                f.type = filter.type || 'bandpass';
+                f.frequency.value = filter.freq || 1000;
+                f.Q.value = filter.Q || 1;
+                src.connect(f); f.connect(g);
+            } else {
+                src.connect(g);
+            }
+            g.connect(ac.destination);
+            src.start(t);
+        } catch (_) {}
+    }
 
-// ── DOM references ─────────────────────────────────────────────
-const $ = id => document.getElementById(id);
+    playDice() {
+        this._noise(0.12, 0.4, { type: 'bandpass', freq: 700, Q: 0.6 });
+        this._note(180, 'triangle', 0.08, 0.2, 0.04);
+    }
 
-// Status bar
-const linkDot    = $('link-dot');
-const linkLabel  = $('link-label');
-const rssiVal    = $('rssi-val');
-const txPwr      = $('tx-pwr');
-const snrValEl   = $('snr-val');
-const linkQuality = $('link-quality');
+    playStep() {
+        this._note(520, 'sine', 0.055, 0.14);
+    }
 
-// Sticks
-const leftZone   = $('left-stick-zone');
-const leftThumb  = $('left-thumb');
-const rightZone  = $('right-stick-zone');
-const rightThumb = $('right-thumb');
+    playAnimal(key) {
+        const fn = { frog: '_frog', snake: '_snake', dino: '_dino', fox: '_fox', croc: '_croc' }[key];
+        if (fn) this[fn]();
+    }
 
-// Mini bars
-const ch1Mini    = $('ch1-mini'); const ch1MiniVal = $('ch1-mini-val');
-const ch2Mini    = $('ch2-mini'); const ch2MiniVal = $('ch2-mini-val');
-const ch3Mini    = $('ch3-mini'); const ch3MiniVal = $('ch3-mini-val');
-const ch4Mini    = $('ch4-mini'); const ch4MiniVal = $('ch4-mini-val');
+    _frog() {
+        // ribbit: two-part descending bleat
+        try {
+            const ac = this.ctx;
+            [0, 0.22].forEach((delay) => {
+                const t = ac.currentTime + delay;
+                const osc = ac.createOscillator();
+                const g = ac.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(520, t);
+                osc.frequency.exponentialRampToValueAtTime(200, t + 0.18);
+                g.gain.setValueAtTime(0.22, t);
+                g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+                osc.connect(g); g.connect(ac.destination);
+                osc.start(t); osc.stop(t + 0.22);
+            });
+        } catch (_) {}
+    }
 
-// Channel footer bars
-const chBars = {};
-const chVals = {};
-for (let i = 1; i <= 8; i++) {
-    chBars[i] = $(`ch${i}-bar`);
-    chVals[i] = $(`ch${i}-val`);
+    _snake() {
+        this._noise(0.55, 0.35, { type: 'highpass', freq: 2800, Q: 0.5 });
+        try {
+            const ac = this.ctx;
+            const t = ac.currentTime + 0.05;
+            const osc = ac.createOscillator();
+            const g = ac.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(120, t);
+            osc.frequency.exponentialRampToValueAtTime(60, t + 0.5);
+            g.gain.setValueAtTime(0.08, t);
+            g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+            osc.connect(g); g.connect(ac.destination);
+            osc.start(t); osc.stop(t + 0.55);
+        } catch (_) {}
+    }
+
+    _dino() {
+        try {
+            const ac = this.ctx;
+            const t = ac.currentTime;
+            const osc = ac.createOscillator();
+            const g = ac.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(95, t);
+            osc.frequency.setValueAtTime(70, t + 0.15);
+            osc.frequency.setValueAtTime(50, t + 0.35);
+            g.gain.setValueAtTime(0.35, t);
+            g.gain.exponentialRampToValueAtTime(0.001, t + 0.65);
+            osc.connect(g); g.connect(ac.destination);
+            osc.start(t); osc.stop(t + 0.7);
+        } catch (_) {}
+    }
+
+    _fox() {
+        this._note(350, 'triangle', 0.08, 0.25);
+        try {
+            const ac = this.ctx;
+            const t = ac.currentTime + 0.06;
+            const osc = ac.createOscillator();
+            const g = ac.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(400, t);
+            osc.frequency.exponentialRampToValueAtTime(900, t + 0.12);
+            osc.frequency.exponentialRampToValueAtTime(600, t + 0.22);
+            g.gain.setValueAtTime(0.25, t);
+            g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+            osc.connect(g); g.connect(ac.destination);
+            osc.start(t); osc.stop(t + 0.28);
+        } catch (_) {}
+    }
+
+    _croc() {
+        try {
+            const ac = this.ctx;
+            const t = ac.currentTime;
+            const osc = ac.createOscillator();
+            const g = ac.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(250, t);
+            osc.frequency.exponentialRampToValueAtTime(40, t + 0.09);
+            g.gain.setValueAtTime(0.5, t);
+            g.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+            osc.connect(g); g.connect(ac.destination);
+            osc.start(t); osc.stop(t + 0.12);
+        } catch (_) {}
+        this._noise(0.06, 0.3, { type: 'bandpass', freq: 400, Q: 2 }, 0.01);
+    }
+
+    playLadder() {
+        [261.63, 329.63, 392.00, 523.25].forEach((f, i) => {
+            this._note(f, 'triangle', 0.28, 0.22, i * 0.11);
+        });
+    }
+
+    playWin() {
+        [261.63, 329.63, 392.00, 523.25, 659.25].forEach((f, i) => {
+            this._note(f, 'triangle', 0.5, 0.2, i * 0.13);
+        });
+    }
+
+    playTTTMove() { this._note(600, 'sine', 0.07, 0.18); }
+    playTTTWin()  { this.playWin(); }
 }
 
-// Telemetry
-const battVal    = $('batt-val');
-const battFill   = $('batt-fill');
-const altVal     = $('alt-val');
-const speedVal   = $('speed-val');
-const rollValEl  = $('roll-val');
-const pitchValEl = $('pitch-val');
+const sound = new SoundEngine();
 
-// Attitude horizon
-const artificialHorizon = $('artificial-horizon');
-const pitchLadder       = $('pitch-ladder');
-const horizonGround     = document.querySelector('.horizon-ground');
+/* ═══════════════════════════════════════════════════════════════
+   BIG CONFETTI
+═══════════════════════════════════════════════════════════════ */
+function launchBigConfetti() {
+    const colours = ['#ef4444','#3b82f6','#22c55e','#fbbf24','#a855f7','#f97316','#ec4899'];
+    const container = document.getElementById('confetti-container');
+    container.innerHTML = '';
+    for (let i = 0; i < 90; i++) {
+        const p = document.createElement('div');
+        p.className = 'confetti-rain';
+        p.style.left = `${Math.random() * 100}%`;
+        const dur = 2.2 + Math.random() * 2.8;
+        p.style.animationDuration = `${dur}s`;
+        p.style.animationDelay = `${Math.random() * 1.5}s`;
+        p.style.backgroundColor = colours[Math.floor(Math.random() * colours.length)];
+        p.style.transform = `rotate(${Math.random() * 360}deg)`;
+        p.style.width  = `${8 + Math.random() * 8}px`;
+        p.style.height = `${10 + Math.random() * 10}px`;
+        container.appendChild(p);
+    }
+    setTimeout(() => { container.innerHTML = ''; }, 5500);
+}
 
-// Bind
-const bindBtn    = $('bind-btn');
-const bindInput  = $('bind-phrase');
-const bindStatus = $('bind-status');
+/* ═══════════════════════════════════════════════════════════════
+   TAB SWITCHING
+═══════════════════════════════════════════════════════════════ */
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const tab = btn.dataset.tab;
+        document.querySelectorAll('.tab-btn').forEach(b =>
+            b.classList.toggle('active', b === btn));
+        document.querySelectorAll('.tab-panel').forEach(p =>
+            p.classList.toggle('hidden', p.id !== `${tab}-panel`));
+    });
+});
 
-// Flight mode buttons
-const fmBtns = document.querySelectorAll('.fm-btn');
+/* ═══════════════════════════════════════════════════════════════
+   CREATURES & LADDERS — CONSTANTS
+═══════════════════════════════════════════════════════════════ */
+const ANIMALS = {
+    frog:  { emoji: '🐸', name: 'Frogs',  color: '#22c55e', sound: 'frog'  },
+    snake: { emoji: '🐍', name: 'Snakes', color: '#ef4444', sound: 'snake' },
+    dino:  { emoji: '🦕', name: 'Dinos',  color: '#0ea5e9', sound: 'dino'  },
+    fox:   { emoji: '🦊', name: 'Foxes',  color: '#f97316', sound: 'fox'   },
+    croc:  { emoji: '🐊', name: 'Crocs',  color: '#16a34a', sound: 'croc'  },
+};
 
-// Packet rate
-const packetRateEl = $('packet-rate');
-const linkModeEl   = $('link-mode');
+// Hazards: head (higher square) → tail (lower square)
+const SNL_HAZARDS = { 99: 78, 87: 24, 64: 60, 62: 19, 17: 7 };
+// Ladders: bottom → top
+const SNL_LADDERS = { 4: 25, 9: 31, 20: 55, 28: 84, 40: 59, 51: 67, 63: 81, 71: 91 };
 
-// ═══════════════════════════════════════════════════════════════
-// VIRTUAL STICK CONTROLLER
-// ═══════════════════════════════════════════════════════════════
+const DICE_FACES = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+const TOKEN_CLASSES = ['p0', 'p1', 'p2', 'p3'];
+const DEFAULT_NAMES = ['Player 1', 'Player 2', 'Player 3', 'Player 4'];
 
-class VirtualStick {
-    constructor(zone, thumb, opts = {}) {
-        this.zone   = zone;
-        this.thumb  = thumb;
-        this.springX = opts.springX !== false;   // auto-center X
-        this.springY = opts.springY !== false;   // auto-center Y
-        this.normalX = 0;   // -1 … +1
-        this.normalY = 0;   // -1 (top) … +1 (bottom)
-        this.active  = false;
-        this.pointerId = null;
-        this._bind();
+/* Board math helpers */
+function squareToPos(sq) {
+    const idx = sq - 1;
+    const rowFromBottom = Math.floor(idx / 10);
+    const posInRow = idx % 10;
+    const col = (rowFromBottom % 2 === 0) ? posInRow : (9 - posInRow);
+    return { row: 9 - rowFromBottom, col };  // row=0 is top
+}
+
+function visualToSquare(rowFromTop, col) {
+    const rowFromBottom = 9 - rowFromTop;
+    return rowFromBottom % 2 === 0
+        ? rowFromBottom * 10 + col + 1
+        : rowFromBottom * 10 + (9 - col) + 1;
+}
+
+function squareCenter(sq) {
+    const { row, col } = squareToPos(sq);
+    return { x: col * 10 + 5, y: row * 10 + 5 };
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CREATURES & LADDERS — GAME CLASS
+═══════════════════════════════════════════════════════════════ */
+class CreaturesGame {
+    constructor(players, animalKey) {
+        this.players = players.map((p, i) => ({
+            name: p.name,
+            isAI: p.isAI,
+            position: 0,
+            idx: i,
+        }));
+        this.animalKey = animalKey;
+        this.currentIdx = 0;
+        this.rolling = false;
+        this.busy = false;
+        this.over = false;
+        this._aiTimer = null;
     }
 
-    _bind() {
-        this.zone.addEventListener('pointerdown', e => this._onDown(e));
-        window.addEventListener('pointermove',    e => this._onMove(e));
-        window.addEventListener('pointerup',      e => this._onUp(e));
-        window.addEventListener('pointercancel',  e => this._onUp(e));
+    destroy() {
+        if (this._aiTimer) { clearTimeout(this._aiTimer); this._aiTimer = null; }
     }
 
-    _onDown(e) {
-        e.preventDefault();
-        this.zone.setPointerCapture(e.pointerId);
-        this.pointerId = e.pointerId;
-        this.active = true;
-        this.zone.classList.add('active');
-        this._update(e);
+    get currentPlayer() { return this.players[this.currentIdx]; }
+
+    _sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    /* ── Build Board ── */
+    buildBoard() {
+        const board = document.getElementById('snl-board');
+        board.innerHTML = '';
+        for (let r = 0; r < 10; r++) {
+            for (let c = 0; c < 10; c++) {
+                const sq = visualToSquare(r, c);
+                const cell = document.createElement('div');
+                cell.className = 'snl-cell';
+                cell.id = `snl-cell-${sq}`;
+                cell.classList.add((r + c) % 2 === 0 ? 'snl-cell-light' : 'snl-cell-dark');
+
+                if (sq === 1)   cell.classList.add('snl-cell-start');
+                if (sq === 100) cell.classList.add('snl-cell-finish');
+                if (SNL_HAZARDS[sq])  cell.classList.add('snl-cell-hazard-head');
+                if (SNL_LADDERS[sq])  cell.classList.add('snl-cell-ladder-bot');
+
+                const num = document.createElement('span');
+                num.className = 'snl-cell-num';
+                num.textContent = sq;
+                cell.appendChild(num);
+
+                if (sq === 100) {
+                    const ic = document.createElement('span');
+                    ic.className = 'snl-cell-icon';
+                    ic.textContent = '🏆';
+                    cell.appendChild(ic);
+                } else if (SNL_HAZARDS[sq]) {
+                    const ic = document.createElement('span');
+                    ic.className = 'snl-cell-icon';
+                    ic.textContent = ANIMALS[this.animalKey].emoji;
+                    cell.appendChild(ic);
+                } else if (SNL_LADDERS[sq]) {
+                    const ic = document.createElement('span');
+                    ic.className = 'snl-cell-icon';
+                    ic.textContent = '🪜';
+                    cell.appendChild(ic);
+                }
+
+                board.appendChild(cell);
+            }
+        }
+        this._drawOverlay();
+        this._buildTokens();
+        this.players.forEach((_, i) => this._placeToken(i));
     }
 
-    _onMove(e) {
-        if (!this.active || e.pointerId !== this.pointerId) return;
-        e.preventDefault();
-        this._update(e);
+    _drawOverlay() {
+        const svg = document.getElementById('snl-svg');
+        svg.innerHTML = '';
+        const NS = 'http://www.w3.org/2000/svg';
+        const animal = ANIMALS[this.animalKey];
+
+        // Draw ladders
+        Object.entries(SNL_LADDERS).forEach(([from, to]) => {
+            const f = squareCenter(+from);
+            const t = squareCenter(+to);
+            const dx = t.x - f.x, dy = t.y - f.y;
+            const len = Math.sqrt(dx*dx + dy*dy) || 1;
+            const nx = (-dy / len) * 1.4, ny = (dx / len) * 1.4;
+            const color = '#f59e0b';
+
+            // Rails
+            [[nx, ny], [-nx, -ny]].forEach(([ox, oy]) => {
+                const line = document.createElementNS(NS, 'line');
+                line.setAttribute('x1', f.x + ox); line.setAttribute('y1', f.y + oy);
+                line.setAttribute('x2', t.x + ox); line.setAttribute('y2', t.y + oy);
+                line.setAttribute('stroke', color);
+                line.setAttribute('stroke-width', '0.9');
+                line.setAttribute('stroke-linecap', 'round');
+                svg.appendChild(line);
+            });
+
+            // Rungs
+            const numRungs = Math.max(2, Math.floor(len / 6));
+            for (let i = 1; i <= numRungs; i++) {
+                const p = i / (numRungs + 1);
+                const rx = f.x + dx * p, ry = f.y + dy * p;
+                const rung = document.createElementNS(NS, 'line');
+                rung.setAttribute('x1', rx + nx); rung.setAttribute('y1', ry + ny);
+                rung.setAttribute('x2', rx - nx); rung.setAttribute('y2', ry - ny);
+                rung.setAttribute('stroke', color);
+                rung.setAttribute('stroke-width', '0.7');
+                svg.appendChild(rung);
+            }
+
+            // Emoji at bottom
+            const em = document.createElementNS(NS, 'text');
+            em.setAttribute('x', f.x); em.setAttribute('y', f.y + 1);
+            em.setAttribute('text-anchor', 'middle');
+            em.setAttribute('dominant-baseline', 'middle');
+            em.setAttribute('font-size', '3.5');
+            em.textContent = '🪜';
+            svg.appendChild(em);
+        });
+
+        // Draw hazard animals
+        Object.entries(SNL_HAZARDS).forEach(([head, tail], i) => {
+            const h = squareCenter(+head);
+            const t = squareCenter(+tail);
+            const cx = (h.x + t.x) / 2 + (i % 2 === 0 ? 12 : -12);
+            const cy = (h.y + t.y) / 2;
+
+            const path = document.createElementNS(NS, 'path');
+            path.setAttribute('d', `M ${h.x} ${h.y} Q ${cx} ${cy} ${t.x} ${t.y}`);
+            path.setAttribute('stroke', animal.color);
+            path.setAttribute('stroke-width', '2.2');
+            path.setAttribute('fill', 'none');
+            path.setAttribute('stroke-linecap', 'round');
+            path.setAttribute('opacity', '0.75');
+            svg.appendChild(path);
+
+            // Emoji at head
+            const em = document.createElementNS(NS, 'text');
+            em.setAttribute('x', h.x); em.setAttribute('y', h.y);
+            em.setAttribute('text-anchor', 'middle');
+            em.setAttribute('dominant-baseline', 'middle');
+            em.setAttribute('font-size', '4.5');
+            em.textContent = animal.emoji;
+            svg.appendChild(em);
+        });
     }
 
-    _onUp(e) {
-        if (e.pointerId !== this.pointerId) return;
-        this.active = false;
-        this.pointerId = null;
-        this.zone.classList.remove('active');
-
-        // Spring back to center
-        if (this.springX) this.normalX = 0;
-        if (this.springY) this.normalY = 0;
-        this._positionThumb();
+    _buildTokens() {
+        const layer = document.getElementById('snl-tokens');
+        layer.innerHTML = '';
+        this.players.forEach((_, i) => {
+            const tok = document.createElement('div');
+            tok.className = `snl-token ${TOKEN_CLASSES[i]}`;
+            tok.id = `snl-token-${i}`;
+            tok.textContent = `P${i + 1}`;
+            layer.appendChild(tok);
+        });
     }
 
-    _update(e) {
-        const rect = this.zone.getBoundingClientRect();
-        const cx = rect.left + rect.width / 2;
-        const cy = rect.top  + rect.height / 2;
-        const radius = Math.min(rect.width, rect.height) / 2 - 24;
+    _placeToken(playerIdx) {
+        const player = this.players[playerIdx];
+        const tok = document.getElementById(`snl-token-${playerIdx}`);
+        if (!tok) return;
+        if (player.position === 0) {
+            // Off-board start position
+            const { row, col } = squareToPos(1);
+            tok.style.left = `${col * 10 + 5 - (playerIdx * 2.5)}%`;
+            tok.style.top  = `${row * 10 + 5 + 9}%`;
+            return;
+        }
+        const { row, col } = squareToPos(player.position);
+        // Offset tokens that share a square
+        const offset = (playerIdx * 2.2) % 6 - 3;
+        tok.style.left = `${col * 10 + 5 + (playerIdx % 2 === 0 ? offset : -offset)}%`;
+        tok.style.top  = `${row * 10 + 5 + (playerIdx < 2 ? -2 : 2)}%`;
+    }
 
-        let dx = e.clientX - cx;
-        let dy = e.clientY - cy;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist > radius) {
-            dx = (dx / dist) * radius;
-            dy = (dy / dist) * radius;
+    _updateActiveToken() {
+        document.querySelectorAll('.snl-token').forEach((t, i) => {
+            t.classList.toggle('active-token', i === this.currentIdx && !this.over);
+        });
+    }
+
+    updatePlayersPanel() {
+        const panel = document.getElementById('snl-players-status');
+        panel.innerHTML = '';
+        this.players.forEach((p, i) => {
+            const card = document.createElement('div');
+            card.className = `snl-player-card${i === this.currentIdx ? ' current-turn' : ''}`;
+            if (p.won) card.classList.add('winner-card');
+            card.innerHTML = `
+                <div class="snl-player-dot ${TOKEN_CLASSES[i]}"></div>
+                <div class="snl-player-info">
+                    <div class="snl-player-name-display">${p.name}${p.isAI ? ' 🤖' : ''}</div>
+                    <div class="snl-player-pos-display">${p.won ? '🏆 Winner!' : (p.position === 0 ? 'Start' : `Square ${p.position}`)}</div>
+                </div>`;
+            panel.appendChild(card);
+        });
+    }
+
+    setMessage(msg) {
+        document.getElementById('snl-message').textContent = msg;
+    }
+
+    setTurnDisplay() {
+        const p = this.currentPlayer;
+        document.getElementById('snl-turn-display').textContent =
+            `${p.name}'s Turn${p.isAI ? ' 🤖' : ''}`;
+    }
+
+    setRollBtnState() {
+        const btn = document.getElementById('snl-roll-btn');
+        const p = this.currentPlayer;
+        btn.disabled = this.busy || this.over || p.isAI;
+    }
+
+    /* ── Roll ── */
+    async roll() {
+        if (this.busy || this.over) return;
+        if (this.currentPlayer.isAI) return;
+        await this._doRoll();
+    }
+
+    async _doRoll() {
+        this.busy = true;
+        this.setRollBtnState();
+        sound.playDice();
+
+        const diceEl = document.getElementById('snl-dice');
+        diceEl.classList.add('dice-rolling');
+        diceEl.classList.remove('dice-land');
+
+        const result = await new Promise(resolve => {
+            let count = 0;
+            const iv = setInterval(() => {
+                diceEl.textContent = DICE_FACES[Math.floor(Math.random() * 6)];
+                count++;
+                if (count >= 13) {
+                    clearInterval(iv);
+                    const r = Math.floor(Math.random() * 6) + 1;
+                    diceEl.textContent = DICE_FACES[r - 1];
+                    resolve(r);
+                }
+            }, 70);
+        });
+
+        diceEl.classList.remove('dice-rolling');
+        diceEl.classList.add('dice-land');
+        setTimeout(() => diceEl.classList.remove('dice-land'), 400);
+
+        await this._movePlayer(result);
+    }
+
+    async _movePlayer(steps) {
+        const player = this.currentPlayer;
+        const newPos = player.position + steps;
+
+        if (newPos > 100) {
+            this.setMessage(`Need ${100 - player.position} or less! Stay at ${player.position || 'Start'}.`);
+            await this._sleep(900);
+            this.busy = false;
+            this._nextTurn();
+            return;
         }
 
-        this.normalX = dx / radius;   // -1 … +1
-        this.normalY = dy / radius;   // -1 … +1 (up = negative)
-        this._positionThumb();
+        // Step-by-step movement
+        const from = player.position;
+        for (let pos = from + 1; pos <= newPos; pos++) {
+            player.position = pos;
+            this._placeToken(this.currentIdx);
+            sound.playStep();
+            await this._sleep(170);
+        }
+
+        // Check win first
+        if (player.position === 100) {
+            await this._handleWin();
+            return;
+        }
+
+        // Check hazard
+        if (SNL_HAZARDS[player.position]) {
+            const dest = SNL_HAZARDS[player.position];
+            const a = ANIMALS[this.animalKey];
+            this.setMessage(`${a.emoji} Oh no! ${a.name} slide you to ${dest}!`);
+            sound.playAnimal(this.animalKey);
+            const container = document.getElementById('snl-board-container');
+            container.classList.add('board-shake');
+            await this._sleep(600);
+            container.classList.remove('board-shake');
+            player.position = dest;
+            this._placeToken(this.currentIdx);
+            await this._sleep(400);
+
+        } else if (SNL_LADDERS[player.position]) {
+            const dest = SNL_LADDERS[player.position];
+            this.setMessage(`🪜 Lucky! Ladder up to ${dest}!`);
+            sound.playLadder();
+            await this._sleep(700);
+            player.position = dest;
+            this._placeToken(this.currentIdx);
+            const tok = document.getElementById(`snl-token-${this.currentIdx}`);
+            if (tok) {
+                tok.classList.add('token-bounce');
+                await this._sleep(550);
+                tok.classList.remove('token-bounce');
+            }
+        } else {
+            this.setMessage('');
+        }
+
+        this.updatePlayersPanel();
+
+        // Check win after hazard/ladder
+        if (player.position === 100) {
+            await this._handleWin();
+            return;
+        }
+
+        this.busy = false;
+        this._nextTurn();
     }
 
-    _positionThumb() {
-        const rect  = this.zone.getBoundingClientRect();
-        const radius = Math.min(rect.width, rect.height) / 2 - 24;
-        const cx = rect.width  / 2;
-        const cy = rect.height / 2;
-        const tx = cx + this.normalX * radius;
-        const ty = cy + this.normalY * radius;
-        this.thumb.style.left = tx + 'px';
-        this.thumb.style.top  = ty + 'px';
+    async _handleWin() {
+        this.over = true;
+        const p = this.currentPlayer;
+        p.won = true;
+        this.setMessage(`🏆 ${p.name} wins! Amazing!`);
+        document.getElementById('snl-turn-display').textContent = `🎉 ${p.name} wins!`;
+        sound.playWin();
+        launchBigConfetti();
+        this.updatePlayersPanel();
+        this._updateActiveToken();
+        this.setRollBtnState();
     }
 
-    // Returns channel value 1000–2000 for axis
-    chanX() { return Math.round(CH_MID + this.normalX * 500); }
-    chanY() { return Math.round(CH_MID - this.normalY * 500); }   // invert Y so up=max
+    _nextTurn() {
+        this.currentIdx = (this.currentIdx + 1) % this.players.length;
+        this._updateActiveToken();
+        this.updatePlayersPanel();
+        this.setTurnDisplay();
+        this.setRollBtnState();
+
+        if (this.players[this.currentIdx].isAI && !this.over) {
+            this._aiTimer = setTimeout(() => {
+                this._aiTimer = null;
+                this._doRoll();
+            }, 1100);
+        }
+    }
 }
 
-// Left stick: Throttle (Y, no spring) + Yaw (X, spring)
-const leftStick = new VirtualStick(leftZone, leftThumb, { springX: true, springY: false });
-// Throttle starts at bottom — normalY = +1
-leftStick.normalY = 1;
-leftStick._positionThumb();
+/* ═══════════════════════════════════════════════════════════════
+   SNL — SETUP UI
+═══════════════════════════════════════════════════════════════ */
+let snlGame = null;
+let snlAnimal = 'frog';
+let snlPlayerCount = 3;
 
-// Right stick: Pitch (Y, spring) + Roll (X, spring)
-const rightStick = new VirtualStick(rightZone, rightThumb, { springX: true, springY: true });
+function buildPlayerConfigs(count) {
+    const container = document.getElementById('snl-player-configs');
+    container.innerHTML = '';
+    for (let i = 0; i < count; i++) {
+        const row = document.createElement('div');
+        row.className = 'snl-player-config';
+        const badge = document.createElement('div');
+        badge.className = `player-token-badge p${i}`;
+        badge.textContent = `P${i + 1}`;
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.className = 'snl-name-input';
+        nameInput.value = DEFAULT_NAMES[i];
+        nameInput.maxLength = 14;
+        nameInput.placeholder = `Player ${i + 1}`;
+        const aiLabel = document.createElement('span');
+        aiLabel.className = 'snl-ai-label';
+        aiLabel.textContent = 'Human';
+        const sw = document.createElement('label');
+        sw.className = 'switch';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.dataset.playerIdx = i;
+        if (i === count - 1 && count > 1) {
+            // Default last player to AI if more than 1
+            cb.checked = false; // user can choose
+        }
+        const span = document.createElement('span');
+        span.className = 'slider';
+        cb.addEventListener('change', () => {
+            aiLabel.textContent = cb.checked ? '🤖 AI' : 'Human';
+        });
+        sw.appendChild(cb);
+        sw.appendChild(span);
+        row.appendChild(badge);
+        row.appendChild(nameInput);
+        row.appendChild(sw);
+        row.appendChild(aiLabel);
+        container.appendChild(row);
+    }
+}
 
-// ═══════════════════════════════════════════════════════════════
-// AUX TOGGLE SWITCHES
-// ═══════════════════════════════════════════════════════════════
+// Animal picker
+document.querySelectorAll('.animal-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.animal-btn').forEach(b => {
+            b.classList.remove('active');
+            b.setAttribute('aria-pressed', 'false');
+        });
+        btn.classList.add('active');
+        btn.setAttribute('aria-pressed', 'true');
+        snlAnimal = btn.dataset.animal;
+        const a = ANIMALS[snlAnimal];
+        document.getElementById('tab-snl-label').textContent = `${a.emoji} ${a.name} & Ladders`;
+        document.getElementById('snl-main-title').textContent = `${a.emoji} ${a.name} & Ladders`;
+    });
+});
 
-const switchConfigs = {
-    'sw-arm':    { onLabel: 'ARMED',    offLabel: 'DISARMED', labelId: 'sw-arm-label',    ch: 5 },
-    'sw-beeper': { onLabel: 'ON',       offLabel: 'OFF',       labelId: 'sw-beeper-label', ch: 7 },
-    'sw-mode':   { onLabel: 'AUX 2',    offLabel: 'AUX 1',    labelId: 'sw-mode-label',   ch: 6 },
-    'sw-turtle': { onLabel: 'ON',       offLabel: 'OFF',       labelId: 'sw-turtle-label', ch: 8 },
+// Player count
+document.querySelectorAll('.count-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.count-btn').forEach(b => {
+            b.classList.remove('active');
+            b.setAttribute('aria-pressed', 'false');
+        });
+        btn.classList.add('active');
+        btn.setAttribute('aria-pressed', 'true');
+        snlPlayerCount = +btn.dataset.count;
+        buildPlayerConfigs(snlPlayerCount);
+    });
+});
+
+// Build initial player configs
+buildPlayerConfigs(snlPlayerCount);
+
+// Start game
+document.getElementById('snl-start-btn').addEventListener('click', () => {
+    const configs = [];
+    document.querySelectorAll('.snl-player-config').forEach((row, i) => {
+        const nameEl = row.querySelector('.snl-name-input');
+        const aiEl   = row.querySelector('input[type=checkbox]');
+        configs.push({
+            name: (nameEl.value.trim() || DEFAULT_NAMES[i]).slice(0, 14),
+            isAI: aiEl.checked,
+        });
+    });
+
+    if (snlGame) snlGame.destroy();
+    snlGame = new CreaturesGame(configs, snlAnimal);
+
+    document.getElementById('snl-setup').classList.add('hidden');
+    document.getElementById('snl-game-screen').classList.remove('hidden');
+
+    snlGame.buildBoard();
+    snlGame.setTurnDisplay();
+    snlGame.setMessage('');
+    snlGame.updatePlayersPanel();
+    snlGame.setRollBtnState();
+    snlGame._updateActiveToken();
+
+    // If first player is AI, kick it off
+    if (snlGame.currentPlayer.isAI) {
+        snlGame._aiTimer = setTimeout(() => {
+            snlGame._aiTimer = null;
+            snlGame._doRoll();
+        }, 1200);
+    }
+});
+
+// Roll button
+document.getElementById('snl-roll-btn').addEventListener('click', () => {
+    if (snlGame) snlGame.roll();
+});
+
+// Back to setup
+document.getElementById('snl-back-btn').addEventListener('click', () => {
+    if (snlGame) { snlGame.destroy(); snlGame = null; }
+    document.getElementById('snl-game-screen').classList.add('hidden');
+    document.getElementById('snl-setup').classList.remove('hidden');
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   TIC-TAC-TOE
+═══════════════════════════════════════════════════════════════ */
+const cells = document.querySelectorAll('.cell');
+const boardEl = document.getElementById('board');
+const winLine = document.getElementById('win-line');
+const statusDisplay = document.getElementById('status');
+const resetBtn = document.getElementById('reset');
+const undoBtn = document.getElementById('undo');
+const resetScoresBtn = document.getElementById('reset-scores');
+const modeBtn = document.getElementById('mode');
+const scoreLabelX = document.getElementById('score-label-x');
+const scoreLabelO = document.getElementById('score-label-o');
+const scoreCardX = document.querySelector('.score-item.score-x');
+const scoreCardO = document.querySelector('.score-item.score-o');
+
+let currentPlayer = 'X';
+let gameActive = true;
+let aiMode = false;
+let board = ['', '', '', '', '', '', '', '', ''];
+let moveHistory = [];
+let aiTimeoutId = null;
+let autoAdvanceIntervalId = null;
+let autoAdvanceTimeoutId = null;
+let aiDifficulty = localStorage.getItem('aiDifficulty') || 'hard';
+
+let multiplayerMode = false;
+let peer = null;
+let conn = null;
+let myRole = null;
+
+function loadPlayerNames() {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem('playerNames') || 'null'); } catch { saved = null; }
+    return { X: sanitizePlayerName(saved?.X, 'X'), O: sanitizePlayerName(saved?.O, 'O') };
+}
+
+let playerNames = loadPlayerNames();
+
+let savedScores = null;
+try { savedScores = JSON.parse(localStorage.getItem('scores') || 'null'); } catch { savedScores = null; }
+const scores = {
+    X:    Number.isInteger(savedScores?.X)    ? savedScores.X    : 0,
+    O:    Number.isInteger(savedScores?.O)    ? savedScores.O    : 0,
+    draw: Number.isInteger(savedScores?.draw) ? savedScores.draw : 0,
 };
 
-document.querySelectorAll('.toggle-switch').forEach(sw => {
-    sw.addEventListener('click', () => {
-        const id  = sw.id;
-        const cfg = switchConfigs[id];
-        if (!cfg) return;
-        const on = sw.classList.toggle('on');
-        $( cfg.labelId ).textContent = on ? cfg.onLabel : cfg.offLabel;
-        channels[`ch${cfg.ch}`] = on ? CH_MAX : CH_MIN;
-    });
-});
+const winningConditions = [
+    [0,1,2],[3,4,5],[6,7,8],
+    [0,3,6],[1,4,7],[2,5,8],
+    [0,4,8],[2,4,6],
+];
 
-// ═══════════════════════════════════════════════════════════════
-// FLIGHT MODE BUTTONS
-// ═══════════════════════════════════════════════════════════════
+function sanitizePlayerName(raw, player) {
+    const t = String(raw || '').trim().slice(0, 16);
+    return t || `Player ${player}`;
+}
 
-fmBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-        fmBtns.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        const ch6 = parseInt(btn.dataset.ch6, 10);
-        channels.ch6 = ch6;
-    });
-});
+function getPlayerName(player) {
+    if (multiplayerMode) return player === myRole ? 'You' : 'Opponent';
+    if (aiMode && player === 'O') return 'AI';
+    return playerNames[player];
+}
 
-// ═══════════════════════════════════════════════════════════════
-// BIND / LINK SIMULATION
-// ═══════════════════════════════════════════════════════════════
+function persistPlayerNames() { localStorage.setItem('playerNames', JSON.stringify(playerNames)); }
 
-bindBtn.addEventListener('click', () => {
-    const phrase = bindInput.value.trim();
-    if (!phrase) {
-        setBindStatus('Enter a binding phrase first.', 'error');
+function updateNameDisplay() {
+    scoreLabelX.textContent = getPlayerName('X');
+    scoreLabelO.textContent = getPlayerName('O');
+}
+
+function updateStatus(text, type) {
+    statusDisplay.textContent = text;
+    statusDisplay.className = type ? `status-${type.toLowerCase()}` : '';
+}
+
+function clearAutoAdvance() {
+    if (autoAdvanceIntervalId !== null) { clearInterval(autoAdvanceIntervalId); autoAdvanceIntervalId = null; }
+    if (autoAdvanceTimeoutId !== null)  { clearTimeout(autoAdvanceTimeoutId);  autoAdvanceTimeoutId = null; }
+}
+
+function setActivePlayerHighlight() {
+    scoreCardX.classList.remove('active-turn');
+    scoreCardO.classList.remove('active-turn');
+    if (!gameActive) return;
+    if (currentPlayer === 'X') scoreCardX.classList.add('active-turn');
+    if (currentPlayer === 'O') scoreCardO.classList.add('active-turn');
+}
+
+function updateUndoButtonState() {
+    undoBtn.disabled = aiMode || multiplayerMode || !gameActive || moveHistory.length === 0;
+}
+
+function setAiThinking(isThinking) { boardEl.classList.toggle('ai-thinking', isThinking); }
+
+function triggerConfettiBurst(player) {
+    const burst = document.createElement('div');
+    burst.className = `confetti-burst ${player.toLowerCase()}`;
+    for (let i = 0; i < 28; i++) {
+        const piece = document.createElement('span');
+        piece.className = 'confetti-piece';
+        const angle = Math.random() * Math.PI * 2;
+        const dist  = 50 + Math.random() * 120;
+        piece.style.setProperty('--dx', `${Math.cos(angle) * dist}px`);
+        piece.style.setProperty('--dy', `${Math.sin(angle) * dist}px`);
+        piece.style.setProperty('--rot', `${Math.floor(Math.random() * 720 - 360)}deg`);
+        piece.style.setProperty('--delay', `${Math.floor(Math.random() * 80)}ms`);
+        piece.style.setProperty('--duration', `${620 + Math.floor(Math.random() * 320)}ms`);
+        burst.appendChild(piece);
+    }
+    boardEl.appendChild(burst);
+    setTimeout(() => burst.remove(), 1100);
+}
+
+function startAutoAdvance(message, type) {
+    if (multiplayerMode) return;
+    clearAutoAdvance();
+    let remaining = 3;
+    updateStatus(`${message} Next round in ${remaining}...`, type);
+    autoAdvanceIntervalId = setInterval(() => {
+        remaining -= 1;
+        if (remaining > 0) updateStatus(`${message} Next round in ${remaining}...`, type);
+    }, 1000);
+    autoAdvanceTimeoutId = setTimeout(() => { clearAutoAdvance(); resetGame({ preserveCountdown: false }); }, 3000);
+}
+
+function getTurnMessage() {
+    if (multiplayerMode) {
+        return currentPlayer === myRole ? `Your turn (${currentPlayer})` : `Opponent's turn (${currentPlayer})`;
+    }
+    if (aiMode && currentPlayer === 'O') return "AI's turn";
+    return `${getPlayerName(currentPlayer)}'s turn`;
+}
+
+function handleCellClick(e) {
+    attemptMove(parseInt(e.currentTarget.getAttribute('data-cell-index'), 10));
+}
+
+function handleCellKeydown(e) {
+    const index = parseInt(e.currentTarget.getAttribute('data-cell-index'), 10);
+    let next = null;
+    if (e.key === 'ArrowLeft'  && index % 3 !== 0) next = index - 1;
+    if (e.key === 'ArrowRight' && index % 3 !== 2) next = index + 1;
+    if (e.key === 'ArrowUp'    && index >= 3)       next = index - 3;
+    if (e.key === 'ArrowDown'  && index <= 5)       next = index + 3;
+    if (next !== null) { e.preventDefault(); cells[next].focus(); return; }
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); attemptMove(index); }
+}
+
+function attemptMove(index) {
+    if (board[index] !== '' || !gameActive) return;
+    if (aiMode && currentPlayer === 'O') return;
+    if (multiplayerMode && currentPlayer !== myRole) return;
+    const player = aiMode ? 'X' : currentPlayer;
+    makeMove(index, player);
+    if (multiplayerMode && conn) conn.send({ type: 'move', index });
+    if (aiMode && gameActive) { setAiThinking(true); aiTimeoutId = setTimeout(aiMove, 400); }
+}
+
+function makeMove(index, player) {
+    board[index] = player;
+    moveHistory.push({ index, player });
+    const cell = cells[index];
+    cell.textContent = player;
+    cell.classList.add(player.toLowerCase(), 'taken', 'pop');
+    cell.addEventListener('animationend', () => cell.classList.remove('pop'), { once: true });
+    sound.playTTTMove();
+
+    const result = checkResult();
+    if (result === 'win') {
+        const winnerName = getPlayerName(player);
+        const message = `${winnerName} wins!`;
+        updateStatus(message, player);
+        triggerConfettiBurst(player);
+        sound.playTTTWin();
+        scores[player] += 1;
+        updateScoreDisplay();
+        gameActive = false;
+        setActivePlayerHighlight();
+        updateUndoButtonState();
+        startAutoAdvance(message, player);
         return;
     }
-    bindBtn.disabled = true;
-    bindBtn.textContent = '...';
-    setBindStatus('Searching for receiver…', '');
+    if (result === 'draw') {
+        const message = "It's a draw!";
+        updateStatus(message, 'draw');
+        scores.draw += 1;
+        updateScoreDisplay();
+        gameActive = false;
+        setActivePlayerHighlight();
+        updateUndoButtonState();
+        startAutoAdvance(message, 'draw');
+        return;
+    }
+    currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+    updateStatus(getTurnMessage(), currentPlayer);
+    setActivePlayerHighlight();
+    updateUndoButtonState();
+}
 
-    // Simulate binding sequence
-    setTimeout(() => {
-        setBindStatus('Receiver found! Handshaking…', '');
-    }, 1000);
+function evaluateBoard(b) {
+    for (const [a, bi, c] of winningConditions) {
+        if (b[a] && b[a] === b[bi] && b[a] === b[c]) return b[a] === 'O' ? 1 : -1;
+    }
+    return 0;
+}
 
-    setTimeout(() => {
-        linked    = true;
-        bindPhrase = phrase;
-        bindBtn.textContent = 'UNBIND';
-        bindBtn.disabled = false;
-        setBindStatus(`Linked — "${phrase}"`, 'ok');
-        linkDot.classList.add('connected');
-        linkLabel.textContent = 'LINKED';
+function minimax(b, depth, isMaximizing) {
+    const score = evaluateBoard(b);
+    if (score !== 0) return score * (10 - depth);
+    if (!b.includes('')) return 0;
+    const empty = b.map((v, i) => (v === '' ? i : null)).filter(v => v !== null);
+    if (isMaximizing) {
+        let best = -Infinity;
+        for (const i of empty) { b[i]='O'; best=Math.max(best,minimax(b,depth+1,false)); b[i]=''; }
+        return best;
+    }
+    let best = Infinity;
+    for (const i of empty) { b[i]='X'; best=Math.min(best,minimax(b,depth+1,true)); b[i]=''; }
+    return best;
+}
 
-        // Start telemetry simulation
-        startTelemSim();
-    }, 2500);
+function aiMove() {
+    setAiThinking(false);
+    aiTimeoutId = null;
+    if (!gameActive) return;
+    const empty = board.map((v, i) => (v === '' ? i : null)).filter(v => v !== null);
+    if (empty.length === 0) return;
+    let idx;
+    if (aiDifficulty === 'easy' || (aiDifficulty === 'medium' && Math.random() < 0.5)) {
+        idx = empty[Math.floor(Math.random() * empty.length)];
+    } else {
+        let bestScore = -Infinity, bestIdx = empty[0];
+        for (const i of empty) {
+            const b = [...board]; b[i] = 'O';
+            const s = minimax(b, 0, false);
+            if (s > bestScore) { bestScore = s; bestIdx = i; }
+        }
+        idx = bestIdx;
+    }
+    makeMove(idx, 'O');
+}
+
+function checkResult() {
+    for (const [a, b, c] of winningConditions) {
+        if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+            cells[a].classList.add('winner');
+            cells[b].classList.add('winner');
+            cells[c].classList.add('winner');
+            drawWinLine(a, b, c);
+            return 'win';
+        }
+    }
+    if (!board.includes('')) return 'draw';
+    return null;
+}
+
+function drawWinLine(a, b, c) {
+    winLine.className = 'win-line';
+    if (a===0&&b===1&&c===2) winLine.classList.add('row-0');
+    else if (a===3&&b===4&&c===5) winLine.classList.add('row-1');
+    else if (a===6&&b===7&&c===8) winLine.classList.add('row-2');
+    else if (a===0&&b===3&&c===6) winLine.classList.add('col-0');
+    else if (a===1&&b===4&&c===7) winLine.classList.add('col-1');
+    else if (a===2&&b===5&&c===8) winLine.classList.add('col-2');
+    else if (a===0&&b===4&&c===8) winLine.classList.add('diag-main');
+    else if (a===2&&b===4&&c===6) winLine.classList.add('diag-anti');
+}
+
+function updateScoreDisplay() {
+    document.getElementById('score-x').textContent    = scores.X;
+    document.getElementById('score-o').textContent    = scores.O;
+    document.getElementById('score-draw').textContent = scores.draw;
+    localStorage.setItem('scores', JSON.stringify(scores));
+}
+
+function resetBoardVisuals() {
+    winLine.className = 'win-line';
+    cells.forEach(cell => { cell.textContent = ''; cell.className = 'cell'; });
+}
+
+function resetGame(options = {}) {
+    const { preserveCountdown = false } = options;
+    if (aiTimeoutId !== null) { clearTimeout(aiTimeoutId); aiTimeoutId = null; }
+    if (!preserveCountdown) clearAutoAdvance();
+    setAiThinking(false);
+    board = ['','','','','','','','',''];
+    moveHistory = [];
+    resetBoardVisuals();
+    gameActive = true;
+    currentPlayer = Math.random() < 0.5 ? 'X' : 'O';
+    updateStatus(getTurnMessage(), currentPlayer);
+    setActivePlayerHighlight();
+    updateUndoButtonState();
+    if (aiMode && currentPlayer === 'O') { setAiThinking(true); aiTimeoutId = setTimeout(aiMove, 400); }
+}
+
+function undoLastMove() {
+    if (undoBtn.disabled) return;
+    const lastMove = moveHistory.pop();
+    if (!lastMove) return;
+    board[lastMove.index] = '';
+    const cell = cells[lastMove.index];
+    cell.textContent = '';
+    cell.className = 'cell';
+    currentPlayer = lastMove.player;
+    winLine.className = 'win-line';
+    cells.forEach(c => c.classList.remove('winner'));
+    updateStatus(getTurnMessage(), currentPlayer);
+    setActivePlayerHighlight();
+    updateUndoButtonState();
+}
+
+cells.forEach(cell => {
+    cell.addEventListener('click', handleCellClick);
+    cell.addEventListener('keydown', handleCellKeydown);
 });
 
-bindBtn.addEventListener('click', function handler() {
-    if (linked) {
-        // Second click = unbind
-        linked = false;
-        linkDot.classList.remove('connected');
-        linkLabel.textContent = 'NO LINK';
-        rssiVal.textContent = '—';
-        snrValEl.textContent = '—';
-        linkQuality.textContent = '—';
-        battVal.textContent = '—';
-        altVal.textContent = '—';
-        speedVal.textContent = '—';
-        battFill.style.width = '0%';
-        setBindStatus('Enter binding phrase and press BIND', '');
-        bindBtn.textContent = 'BIND';
-        stopTelemSim();
+resetBtn.addEventListener('click', () => {
+    if (multiplayerMode && myRole !== 'X') { updateStatus('Ask the host to start a new round.', null); return; }
+    resetGame();
+    if (multiplayerMode && conn) conn.send({ type: 'reset', starterPlayer: currentPlayer });
+});
+
+undoBtn.addEventListener('click', undoLastMove);
+
+resetScoresBtn.addEventListener('click', () => {
+    if (multiplayerMode && myRole !== 'X') { updateStatus('Ask the host to reset scores.', null); return; }
+    scores.X = 0; scores.O = 0; scores.draw = 0;
+    updateScoreDisplay();
+    resetGame();
+    if (multiplayerMode && conn) {
+        conn.send({ type: 'reset-scores' });
+        conn.send({ type: 'reset', starterPlayer: currentPlayer });
     }
-}, { once: false });
+});
 
-function setBindStatus(msg, cls) {
-    bindStatus.textContent = msg;
-    bindStatus.className   = 'bind-status' + (cls ? ' ' + cls : '');
+modeBtn.addEventListener('click', () => {
+    if (multiplayerMode) return;
+    aiMode = !aiMode;
+    modeBtn.textContent = aiMode ? 'Switch to Human Mode' : 'Switch to AI Mode';
+    updateNameDisplay();
+    resetGame();
+});
+
+// Settings
+const settingsBtn     = document.getElementById('settings-btn');
+const settingsOverlay = document.getElementById('settings-overlay');
+const settingsClose   = document.getElementById('settings-close');
+const darkModeToggle  = document.getElementById('dark-mode-toggle');
+const settingsPanel   = document.getElementById('settings-panel');
+const difficultySelect= document.getElementById('difficulty-select');
+const playerXNameInput= document.getElementById('player-x-name');
+const playerONameInput= document.getElementById('player-o-name');
+
+function openSettings()  { settingsOverlay.classList.remove('hidden'); darkModeToggle.focus(); }
+function closeSettings() { settingsOverlay.classList.add('hidden'); settingsBtn.focus(); }
+
+function savePlayerName(player, raw) {
+    playerNames[player] = sanitizePlayerName(raw, player);
+    persistPlayerNames();
+    updateNameDisplay();
+    if (gameActive) updateStatus(getTurnMessage(), currentPlayer);
 }
 
-// ═══════════════════════════════════════════════════════════════
-// TELEMETRY SIMULATION (when linked)
-// ═══════════════════════════════════════════════════════════════
-
-let telemTimer = null;
-let telemTick  = 0;
-
-function startTelemSim() {
-    telemTick = 0;
-    telem.battery  = 16.6;
-    telem.altitude = 0;
-    telem.speed    = 0;
-    telem.lq       = 100;
-    telem.rssi     = -60;
-    telem.snr      = 12;
-    telemTimer = setInterval(updateTelemSim, 500);
-}
-
-function stopTelemSim() {
-    clearInterval(telemTimer);
-    telemTimer = null;
-}
-
-function updateTelemSim() {
-    telemTick++;
-    // Battery drains slowly
-    telem.battery = Math.max(14.8, telem.battery - 0.002);
-
-    // Altitude follows throttle stick
-    const throttleNorm = (channels.ch3 - CH_MIN) / (CH_MAX - CH_MIN);
-    telem.altitude += (throttleNorm - 0.3) * 0.5;
-    telem.altitude  = Math.max(0, telem.altitude);
-
-    // Speed follows roll/pitch deviation
-    const rollDev  = Math.abs(channels.ch1 - CH_MID) / 500;
-    const pitchDev = Math.abs(channels.ch2 - CH_MID) / 500;
-    telem.speed     = Math.round((rollDev + pitchDev) * 60);
-
-    // Simulate LQ/RSSI drift
-    telem.lq   = Math.min(100, Math.max(70, telem.lq   + (Math.random() - 0.5) * 4));
-    telem.rssi = Math.min(-40, Math.max(-90, telem.rssi + (Math.random() - 0.5) * 2));
-    telem.snr  = Math.min(20, Math.max(5,   telem.snr   + (Math.random() - 0.5)));
-
-    // Attitude follows sticks
-    telem.roll  = (channels.ch1 - CH_MID) / 500 * 45;
-    telem.pitch = -(channels.ch2 - CH_MID) / 500 * 30;
-
-    updateTelemDisplay();
-}
-
-function updateTelemDisplay() {
-    if (!linked) return;
-
-    // Top bar
-    rssiVal.textContent = telem.rssi.toFixed(0);
-    snrValEl.textContent = telem.snr.toFixed(1);
-    linkQuality.textContent = telem.lq.toFixed(0);
-
-    // Telem panel
-    battVal.textContent  = telem.battery.toFixed(1);
-    altVal.textContent   = telem.altitude.toFixed(1);
-    speedVal.textContent = telem.speed;
-
-    // Battery bar
-    const battPercent = Math.max(0, Math.min(100,
-        ((telem.battery - 14.8) / (16.8 - 14.8)) * 100));
-    battFill.style.width = battPercent + '%';
-    battFill.style.background = battPercent > 50 ? 'var(--green)'
-        : battPercent > 25 ? 'var(--orange)' : 'var(--red)';
-
-    // Artificial horizon
-    updateHorizon(telem.roll, telem.pitch);
-    rollValEl.textContent  = telem.roll.toFixed(1) + '°';
-    pitchValEl.textContent = telem.pitch.toFixed(1) + '°';
-}
-
-function updateHorizon(rollDeg, pitchDeg) {
-    // Rotate horizon for roll
-    artificialHorizon.style.transform = `rotate(${-rollDeg}deg)`;
-
-    // Shift ground for pitch (positive pitch = nose up = ground moves down)
-    const pitchOffset = (pitchDeg / 90) * 50;  // % of container height
-    const groundHeight = 50 - pitchOffset;
-    horizonGround.style.height = Math.max(0, Math.min(100, groundHeight)) + '%';
-
-    // Shift pitch ladder opposite direction
-    const ladderShift = (pitchDeg / 90) * 40;
-    pitchLadder.style.transform = `translateY(${ladderShift}%)`;
-}
-
-// ═══════════════════════════════════════════════════════════════
-// MAIN UPDATE LOOP — runs at ~50 Hz
-// ═══════════════════════════════════════════════════════════════
-
-function updateChannels() {
-    // Map sticks to channels
-    channels.ch1 = rightStick.chanX();   // Roll
-    channels.ch2 = rightStick.chanY();   // Pitch (inverted handled in chanY)
-    channels.ch3 = leftStick.chanY();    // Throttle (bottom=1000, top=2000)
-    channels.ch4 = leftStick.chanX();    // Yaw
-
-    // Note: ch3 = throttle uses Y with no spring
-    // chanY() gives top=2000, bottom=1000 — correct for throttle
-    // But leftStick.normalY starts at +1 (bottom), so ch3 starts at 1000 ✓
-}
-
-function updateChannelUI() {
-    // Footer bars
-    for (let i = 1; i <= 8; i++) {
-        const val = channels[`ch${i}`];
-        const pct = ((val - CH_MIN) / (CH_MAX - CH_MIN)) * 100;
-        chBars[i].style.height = pct + '%';
-        chVals[i].textContent  = val;
+settingsBtn.addEventListener('click', openSettings);
+settingsClose.addEventListener('click', closeSettings);
+settingsOverlay.addEventListener('click', e => { if (e.target === settingsOverlay) closeSettings(); });
+settingsOverlay.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { closeSettings(); return; }
+    if (e.key === 'Tab') {
+        const focusable = settingsPanel.querySelectorAll('input, button, select, [tabindex]');
+        const first = focusable[0], last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     }
+});
 
-    // Mini bars (side panels)
-    const miniData = [
-        { fill: ch1Mini, valEl: ch1MiniVal, ch: 'ch1' },
-        { fill: ch2Mini, valEl: ch2MiniVal, ch: 'ch2' },
-        { fill: ch3Mini, valEl: ch3MiniVal, ch: 'ch3' },
-        { fill: ch4Mini, valEl: ch4MiniVal, ch: 'ch4' },
-    ];
-    miniData.forEach(({ fill, valEl, ch }) => {
-        const val = channels[ch];
-        const pct = ((val - CH_MIN) / (CH_MAX - CH_MIN)) * 100;
-        fill.style.width   = pct + '%';
-        valEl.textContent  = val;
+playerXNameInput.value = playerNames.X;
+playerONameInput.value = playerNames.O;
+
+playerXNameInput.addEventListener('change', () => { savePlayerName('X', playerXNameInput.value); playerXNameInput.value = playerNames.X; });
+playerONameInput.addEventListener('change', () => { savePlayerName('O', playerONameInput.value); playerONameInput.value = playerNames.O; });
+
+darkModeToggle.addEventListener('change', () => {
+    document.body.classList.toggle('dark-mode', darkModeToggle.checked);
+    localStorage.setItem('darkMode', darkModeToggle.checked);
+});
+
+if (localStorage.getItem('darkMode') === 'true') {
+    darkModeToggle.checked = true;
+    document.body.classList.add('dark-mode');
+}
+
+difficultySelect.value = aiDifficulty;
+difficultySelect.addEventListener('change', () => {
+    aiDifficulty = difficultySelect.value;
+    localStorage.setItem('aiDifficulty', aiDifficulty);
+});
+
+// Multiplayer (PeerJS WebRTC)
+const mpBtn        = document.getElementById('mp-btn');
+const mpOverlay    = document.getElementById('mp-overlay');
+const mpLobby      = document.getElementById('mp-lobby');
+const mpWaiting    = document.getElementById('mp-waiting');
+const mpRoomCode   = document.getElementById('mp-room-code');
+const mpStatusText = document.getElementById('mp-status-text');
+const mpCodeInput  = document.getElementById('mp-code-input');
+const mpHint       = document.getElementById('mp-hint');
+
+function generateRoomCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = '';
+    for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+    return code;
+}
+
+function isValidPlayerSymbol(v) { return v === 'X' || v === 'O'; }
+
+function openMultiplayerLobby() {
+    mpOverlay.classList.remove('hidden');
+    mpLobby.classList.remove('hidden');
+    mpWaiting.classList.add('hidden');
+    mpStatusText.textContent = '';
+    mpStatusText.className = 'mp-status';
+    mpCodeInput.value = '';
+}
+
+function closeMultiplayerLobby() { mpOverlay.classList.add('hidden'); }
+
+function setMpStatus(text, type) {
+    mpStatusText.textContent = text;
+    mpStatusText.className = `mp-status${type ? ' ' + type : ''}`;
+}
+
+function destroyPeer() {
+    if (conn) { try { conn.close(); } catch {} conn = null; }
+    if (peer) { try { peer.destroy(); } catch {} peer = null; }
+}
+
+function enterMultiplayerMode(role) {
+    multiplayerMode = true; myRole = role; aiMode = false;
+    modeBtn.textContent = 'Switch to AI Mode';
+    modeBtn.disabled = true;
+    closeMultiplayerLobby();
+    mpBtn.textContent = 'Disconnect';
+    updateNameDisplay();
+}
+
+function exitMultiplayerMode() {
+    destroyPeer();
+    multiplayerMode = false; myRole = null;
+    mpBtn.textContent = 'Multiplayer';
+    modeBtn.disabled = false;
+    updateNameDisplay();
+    resetGame();
+}
+
+function setupConnHandlers(connection) {
+    conn = connection;
+    conn.on('open', () => {
+        if (myRole === 'X') { enterMultiplayerMode('X'); resetGame(); conn.send({ type: 'init', starterPlayer: currentPlayer }); }
+        else { setMpStatus('Connected! Waiting for game start...', 'connected'); }
+    });
+    conn.on('data', (data) => {
+        switch (data.type) {
+            case 'init':
+                if (!isValidPlayerSymbol(data.starterPlayer)) break;
+                enterMultiplayerMode('O'); resetGame();
+                currentPlayer = data.starterPlayer;
+                updateStatus(getTurnMessage(), currentPlayer);
+                setActivePlayerHighlight(); updateUndoButtonState();
+                break;
+            case 'move':
+                if (typeof data.index === 'number' && data.index >= 0 && data.index <= 8 && Number.isInteger(data.index))
+                    makeMove(data.index, currentPlayer);
+                break;
+            case 'reset':
+                if (!isValidPlayerSymbol(data.starterPlayer)) break;
+                resetGame(); currentPlayer = data.starterPlayer;
+                updateStatus(getTurnMessage(), currentPlayer);
+                setActivePlayerHighlight();
+                break;
+            case 'reset-scores':
+                scores.X = 0; scores.O = 0; scores.draw = 0; updateScoreDisplay();
+                break;
+        }
+    });
+    conn.on('close', () => {
+        if (multiplayerMode) {
+            multiplayerMode = false; myRole = null; conn = null;
+            mpBtn.textContent = 'Multiplayer';
+            modeBtn.disabled = false;
+            updateNameDisplay(); resetGame();
+            updateStatus('Opponent disconnected. Playing locally.', null);
+        }
+    });
+    conn.on('error', (err) => {
+        setMpStatus(`Connection error: ${err.type}`, 'error');
+        document.getElementById('mp-join').disabled = false;
     });
 }
 
-// Keyboard control (for testing on desktop)
-const keys = {};
-window.addEventListener('keydown', e => { keys[e.code] = true; });
-window.addEventListener('keyup',   e => { keys[e.code] = false; });
+mpBtn.addEventListener('click', () => { multiplayerMode ? exitMultiplayerMode() : openMultiplayerLobby(); });
+document.getElementById('mp-close').addEventListener('click', closeMultiplayerLobby);
+mpOverlay.addEventListener('click', e => { if (e.target === mpOverlay) closeMultiplayerLobby(); });
 
-const KEYBOARD_STEP = 0.04;
+document.getElementById('mp-create').addEventListener('click', () => {
+    destroyPeer();
+    mpLobby.classList.add('hidden');
+    mpWaiting.classList.remove('hidden');
+    mpRoomCode.textContent = '—';
+    mpHint.textContent = 'Connecting to server...';
+    setMpStatus('');
+    document.getElementById('mp-copy').disabled = true;
+    const roomCode = generateRoomCode();
+    peer = new Peer(roomCode);
+    peer.on('open', (id) => { myRole = 'X'; mpRoomCode.textContent = id; mpHint.textContent = 'Waiting for opponent to join...'; document.getElementById('mp-copy').disabled = false; });
+    peer.on('connection', (connection) => { if (conn) { connection.close(); return; } mpHint.textContent = 'Opponent connected!'; setupConnHandlers(connection); });
+    peer.on('error', (err) => {
+        if (err.type === 'unavailable-id') { peer.destroy(); document.getElementById('mp-create').click(); return; }
+        setMpStatus(`Error: ${err.type}`, 'error');
+        mpLobby.classList.remove('hidden'); mpWaiting.classList.add('hidden');
+    });
+});
 
-function applyKeyboard() {
-    // W/S = throttle up/down (left stick Y, no spring)
-    if (keys['KeyW']) leftStick.normalY = Math.max(-1, leftStick.normalY - KEYBOARD_STEP);
-    if (keys['KeyS']) leftStick.normalY = Math.min( 1, leftStick.normalY + KEYBOARD_STEP);
+document.getElementById('mp-join').addEventListener('click', () => {
+    const code = mpCodeInput.value.trim().toUpperCase();
+    if (!code) return;
+    const joinBtn = document.getElementById('mp-join');
+    joinBtn.disabled = true;
+    destroyPeer();
+    setMpStatus('Connecting...', '');
+    myRole = 'O';
+    peer = new Peer();
+    peer.on('open', () => { const c = peer.connect(code, { reliable: true }); setupConnHandlers(c); });
+    peer.on('error', (err) => { setMpStatus(`Error: ${err.type}`, 'error'); myRole = null; document.getElementById('mp-join').disabled = false; });
+});
 
-    // A/D = yaw left/right (left stick X)
-    if (keys['KeyA']) leftStick.normalX = Math.max(-1, leftStick.normalX - KEYBOARD_STEP);
-    if (keys['KeyD']) leftStick.normalX = Math.min( 1, leftStick.normalX + KEYBOARD_STEP);
-
-    // Arrow keys = pitch/roll (right stick)
-    if (keys['ArrowLeft'])  rightStick.normalX = Math.max(-1, rightStick.normalX - KEYBOARD_STEP);
-    if (keys['ArrowRight']) rightStick.normalX = Math.min( 1, rightStick.normalX + KEYBOARD_STEP);
-    if (keys['ArrowUp'])    rightStick.normalY = Math.max(-1, rightStick.normalY - KEYBOARD_STEP);
-    if (keys['ArrowDown'])  rightStick.normalY = Math.min( 1, rightStick.normalY + KEYBOARD_STEP);
-
-    // Spring back right stick when no key held
-    if (!keys['ArrowLeft']  && !keys['ArrowRight']) {
-        rightStick.normalX *= 0.85;
-        if (Math.abs(rightStick.normalX) < 0.01) rightStick.normalX = 0;
+document.getElementById('mp-copy').addEventListener('click', () => {
+    const code = mpRoomCode.textContent;
+    if (code && code !== '—') {
+        navigator.clipboard.writeText(code).then(() => {
+            const btn = document.getElementById('mp-copy');
+            btn.textContent = 'Copied!';
+            setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+        });
     }
-    if (!keys['ArrowUp'] && !keys['ArrowDown']) {
-        rightStick.normalY *= 0.85;
-        if (Math.abs(rightStick.normalY) < 0.01) rightStick.normalY = 0;
-    }
+});
 
-    // Spring back yaw when no key
-    if (!keys['KeyA'] && !keys['KeyD']) {
-        leftStick.normalX *= 0.85;
-        if (Math.abs(leftStick.normalX) < 0.01) leftStick.normalX = 0;
-    }
-
-    // Update thumb positions
-    leftStick._positionThumb();
-    rightStick._positionThumb();
-}
-
-// ── Main loop ─────────────────────────────────────────────────
-let lastFrame = 0;
-function loop(ts) {
-    if (ts - lastFrame >= 20) {   // ~50 fps
-        lastFrame = ts;
-        applyKeyboard();
-        updateChannels();
-        updateChannelUI();
-    }
-    requestAnimationFrame(loop);
-}
-
-requestAnimationFrame(loop);
-
-// ── Keyboard hint ─────────────────────────────────────────────
-console.info(
-    '%cELRS Handset — Keyboard Controls\n' +
-    'W/S       — Throttle up/down\n' +
-    'A/D       — Yaw left/right\n' +
-    'Arrow keys — Pitch/Roll',
-    'font-family:monospace; color:#00d4ff'
-);
+// Init TTT
+updateNameDisplay();
+updateScoreDisplay();
+resetGame();
