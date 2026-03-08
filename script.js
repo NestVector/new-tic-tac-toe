@@ -61,7 +61,7 @@ function applyAge(ageKey) {
     if (tttSel) {
         tttSel.value = defaultDiff;
         // Update in-memory value and storage
-        if (typeof aiDifficulty !== 'undefined') aiDifficulty = defaultDiff;
+        try { if (aiDifficulty !== undefined) aiDifficulty = defaultDiff; } catch (_) {}
         safeStorage.setItem('aiDifficulty', defaultDiff);
     }
     // SNL difficulty
@@ -69,7 +69,7 @@ function applyAge(ageKey) {
     if (snlSel) {
         snlSel.value = defaultDiff;
         safeStorage.setItem('snlAiDifficulty', defaultDiff);
-        if (typeof snlGame !== 'undefined' && snlGame) snlGame.aiDifficulty = defaultDiff;
+        try { if (snlGame) snlGame.aiDifficulty = defaultDiff; } catch (_) {}
     }
 }
 
