@@ -731,6 +731,7 @@ class CreaturesGame {
 
         // Check win first
         if (player.position === 100) {
+            _ensureCleanup();
             await this._handleWin();
             return;
         }
@@ -787,6 +788,7 @@ class CreaturesGame {
 
     async _handleWin() {
         this.over = true;
+        this.busy = false;
         const p = this.currentPlayer;
         p.won = true;
         this.setMessage(`🏆 ${p.name} wins! Amazing!`);
@@ -799,6 +801,7 @@ class CreaturesGame {
     }
 
     _nextTurn() {
+        this.busy = false;
         this.currentIdx = (this.currentIdx + 1) % this.players.length;
         this._updateActiveToken();
         this.updatePlayersPanel();
