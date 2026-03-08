@@ -1,6 +1,92 @@
 'use strict';
 
 /* ═══════════════════════════════════════════════════════════════
+   SAFE LOCALSTORAGE — prevents fatal errors in restricted contexts
+═══════════════════════════════════════════════════════════════ */
+const safeStorage = (() => {
+    try {
+        localStorage.setItem('__test__', '1');
+        localStorage.removeItem('__test__');
+        return localStorage;
+    } catch (_) {
+        const _mem = {};
+        return {
+            getItem:    k     => Object.prototype.hasOwnProperty.call(_mem, k) ? _mem[k] : null,
+            setItem:    (k,v) => { _mem[k] = String(v); },
+            removeItem: k     => { delete _mem[k]; },
+        };
+    }
+})();
+
+/* ═══════════════════════════════════════════════════════════════
+   AGE SYSTEM
+═══════════════════════════════════════════════════════════════ */
+const AGE_GROUP_MAP = {
+    '5': 'age-tiny', '6': 'age-tiny',
+    '7': 'age-small', '8': 'age-small',
+    '9': 'age-mid', '10': 'age-mid',
+    '11': 'age-big', '12plus': 'age-big',
+};
+const AGE_STEP_DELAY = {
+    'age-tiny': 280, 'age-small': 200, 'age-mid': 170, 'age-big': 130,
+};
+
+let currentAgeGroup = 'age-mid';
+
+// Age → default AI difficulty mapping
+const AGE_AI_DIFFICULTY = {
+    'age-tiny':  'easy',
+    'age-small': 'easy',
+    'age-mid':   'medium',
+    'age-big':   'hard',
+};
+
+function applyAge(ageKey) {
+    const group = AGE_GROUP_MAP[ageKey] || 'age-mid';
+    currentAgeGroup = group;
+    const body = document.body;
+    // Remove all age classes
+    body.classList.remove('age-tiny', 'age-small', 'age-mid', 'age-big');
+    body.classList.add(group);
+    // Update pill active state
+    document.querySelectorAll('.age-pill').forEach(p => {
+        p.classList.toggle('active-age', p.dataset.age === ageKey);
+    });
+    safeStorage.setItem('selectedAge', ageKey);
+
+    // Auto-set AI difficulty for both games based on age (only if not manually overridden this session)
+    const defaultDiff = AGE_AI_DIFFICULTY[group] || 'medium';
+    // TTT difficulty
+    const tttSel = document.getElementById('difficulty-select');
+    if (tttSel) {
+        tttSel.value = defaultDiff;
+        // Update in-memory value and storage
+        try { if (aiDifficulty !== undefined) aiDifficulty = defaultDiff; } catch (_) {}
+        safeStorage.setItem('aiDifficulty', defaultDiff);
+    }
+    // SNL difficulty
+    const snlSel = document.getElementById('snl-difficulty-select');
+    if (snlSel) {
+        snlSel.value = defaultDiff;
+        safeStorage.setItem('snlAiDifficulty', defaultDiff);
+        try { if (snlGame) snlGame.aiDifficulty = defaultDiff; } catch (_) {}
+    }
+}
+
+function getStepDelay() {
+    return AGE_STEP_DELAY[currentAgeGroup] || 170;
+}
+
+// Init age system
+(function initAgeSystem() {
+    const savedAge = safeStorage.getItem('selectedAge') || '9';
+    applyAge(savedAge);
+    document.querySelectorAll('.age-pill').forEach(pill => {
+        pill.addEventListener('click', () => applyAge(pill.dataset.age));
+    });
+})();
+
+/* ═══════════════════════════════════════════════════════════════
    SOUND ENGINE  (Web Audio API)
 ═══════════════════════════════════════════════════════════════ */
 class SoundEngine {
@@ -215,6 +301,56 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 });
 
 /* ═══════════════════════════════════════════════════════════════
+   3D DICE — FACE TRANSFORMS
+═══════════════════════════════════════════════════════════════ */
+const FACE_TRANSFORMS = {
+    1: 'rotateX(0deg) rotateY(0deg)',
+    2: 'rotateX(0deg) rotateY(90deg)',
+    3: 'rotateX(90deg) rotateY(0deg)',
+    4: 'rotateX(-90deg) rotateY(0deg)',
+    5: 'rotateX(0deg) rotateY(-90deg)',
+    6: 'rotateX(0deg) rotateY(180deg)',
+};
+
+function rollDice3D(value) {
+    return new Promise((resolve) => {
+        const cube = document.getElementById('dice-cube');
+        if (!cube) { resolve(); return; }
+        cube.classList.remove('rolling');
+        // Force reflow
+        void cube.offsetWidth;
+        cube.classList.add('rolling');
+        function onEnd() {
+            cube.removeEventListener('animationend', onEnd);
+            cube.classList.remove('rolling');
+            cube.style.transform = FACE_TRANSFORMS[value];
+            resolve();
+        }
+        cube.addEventListener('animationend', onEnd, { once: true });
+        // Fallback in case animationend doesn't fire
+        setTimeout(() => {
+            cube.removeEventListener('animationend', onEnd);
+            cube.classList.remove('rolling');
+            cube.style.transform = FACE_TRANSFORMS[value];
+            resolve();
+        }, 1100);
+    });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   S&L MULTIPLAYER — ROOM CODE GENERATION
+═══════════════════════════════════════════════════════════════ */
+const SNL_WORDS_A = ['HAPPY','SILLY','BOUNCY','FLUFFY','SPARKLY','RAINBOW','WIGGLY','GIGGLY','ZIPPY','SNAPPY','DIZZY','FUZZY'];
+const SNL_WORDS_B = ['PANDA','BUNNY','TIGER','UNICORN','DRAGON','PUPPY','KITTY','PENGUIN','MONKEY','TURTLE','PARROT','HEDGEHOG'];
+
+function generateSnlRoomCode() {
+    const a = SNL_WORDS_A[Math.floor(Math.random() * SNL_WORDS_A.length)];
+    const b = SNL_WORDS_B[Math.floor(Math.random() * SNL_WORDS_B.length)];
+    const n = String(Math.floor(Math.random() * 90) + 10);
+    return a + b + n;
+}
+
+/* ═══════════════════════════════════════════════════════════════
    CREATURES & LADDERS — CONSTANTS
 ═══════════════════════════════════════════════════════════════ */
 const ANIMALS = {
@@ -226,9 +362,18 @@ const ANIMALS = {
 };
 
 // Hazards: head (higher square) → tail (lower square)
-const SNL_HAZARDS = { 99: 78, 87: 24, 64: 60, 62: 19, 17: 7 };
+const SNL_HAZARDS_FULL = { 99: 78, 87: 24, 64: 60, 62: 19, 17: 7 };
+const SNL_HAZARDS_TINY = { 87: 24, 62: 19, 17: 7 }; // Only 3 for age-tiny
 // Ladders: bottom → top
-const SNL_LADDERS = { 4: 25, 9: 31, 20: 55, 28: 84, 40: 59, 51: 67, 63: 81, 71: 91 };
+const SNL_LADDERS_FULL = { 4: 25, 9: 31, 20: 55, 28: 84, 40: 59, 51: 67, 63: 81, 71: 91 };
+const SNL_LADDERS_TINY = { 4: 25, 20: 55, 40: 59, 71: 91 }; // Only 4 for age-tiny
+
+function getSNLHazards() {
+    return currentAgeGroup === 'age-tiny' ? SNL_HAZARDS_TINY : SNL_HAZARDS_FULL;
+}
+function getSNLLadders() {
+    return currentAgeGroup === 'age-tiny' ? SNL_LADDERS_TINY : SNL_LADDERS_FULL;
+}
 
 const DICE_FACES = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
 const TOKEN_CLASSES = ['p0', 'p1', 'p2', 'p3'];
@@ -272,9 +417,16 @@ class CreaturesGame {
         this.busy = false;
         this.over = false;
         this._aiTimer = null;
+        // Multiplayer
+        this.mpConn = null;
+        this.myPlayerIdx = null;
+        this.mpMode = false;
+        // AI difficulty
+        this.aiDifficulty = safeStorage.getItem('snlAiDifficulty') || 'medium';
     }
 
     destroy() {
+        this.destroyed = true;
         if (this._aiTimer) { clearTimeout(this._aiTimer); this._aiTimer = null; }
     }
 
@@ -296,8 +448,11 @@ class CreaturesGame {
 
                 if (sq === 1)   cell.classList.add('snl-cell-start');
                 if (sq === 100) cell.classList.add('snl-cell-finish');
-                if (SNL_HAZARDS[sq])  cell.classList.add('snl-cell-hazard-head');
-                if (SNL_LADDERS[sq])  cell.classList.add('snl-cell-ladder-bot');
+                if (getSNLHazards()[sq])  cell.classList.add('snl-cell-hazard-head');
+                if (getSNLLadders()[sq])  cell.classList.add('snl-cell-ladder-bot');
+                // Mark ladder destination (top) squares
+                const ladderTops = Object.values(getSNLLadders());
+                if (ladderTops.includes(sq)) cell.classList.add('snl-cell-ladder-top');
 
                 const num = document.createElement('span');
                 num.className = 'snl-cell-num';
@@ -309,12 +464,12 @@ class CreaturesGame {
                     ic.className = 'snl-cell-icon';
                     ic.textContent = '🏆';
                     cell.appendChild(ic);
-                } else if (SNL_HAZARDS[sq]) {
+                } else if (getSNLHazards()[sq]) {
                     const ic = document.createElement('span');
                     ic.className = 'snl-cell-icon';
                     ic.textContent = ANIMALS[this.animalKey].emoji;
                     cell.appendChild(ic);
-                } else if (SNL_LADDERS[sq]) {
+                } else if (getSNLLadders()[sq]) {
                     const ic = document.createElement('span');
                     ic.className = 'snl-cell-icon';
                     ic.textContent = '🪜';
@@ -358,7 +513,7 @@ class CreaturesGame {
         svg.appendChild(defs);
 
         // Draw ladders
-        Object.entries(SNL_LADDERS).forEach(([from, to]) => {
+        Object.entries(getSNLLadders()).forEach(([from, to]) => {
             const f = squareCenter(+from);
             const t = squareCenter(+to);
             const dx = t.x - f.x, dy = t.y - f.y;
@@ -402,7 +557,7 @@ class CreaturesGame {
         });
 
         // Draw hazard animals
-        Object.entries(SNL_HAZARDS).forEach(([head, tail], i) => {
+        Object.entries(getSNLHazards()).forEach(([head, tail], i) => {
             const h = squareCenter(+head);
             const t = squareCenter(+tail);
             const cx = (h.x + t.x) / 2 + (i % 2 === 0 ? 12 : -12);
@@ -465,6 +620,27 @@ class CreaturesGame {
         });
     }
 
+    _showGhostToken(playerIdx, targetSquare) {
+        this._clearGhostToken();
+        const layer = document.getElementById('snl-tokens');
+        if (!layer) return;
+        const ghost = document.createElement('div');
+        ghost.className = `snl-ghost-token ${TOKEN_CLASSES[playerIdx]}`;
+        ghost.id = 'snl-ghost-token';
+        ghost.style.opacity = '0.45';
+        const { row, col } = squareToPos(targetSquare);
+        const offset = (playerIdx * 2.2) % 6 - 3;
+        ghost.style.left = `${col * 10 + 5 + (playerIdx % 2 === 0 ? offset : -offset)}%`;
+        ghost.style.top  = `${row * 10 + 5 + (playerIdx < 2 ? -2 : 2)}%`;
+        ghost.textContent = `P${playerIdx + 1}`;
+        layer.appendChild(ghost);
+    }
+
+    _clearGhostToken() {
+        const existing = document.getElementById('snl-ghost-token');
+        if (existing) existing.remove();
+    }
+
     updatePlayersPanel() {
         const panel = document.getElementById('snl-players-status');
         panel.innerHTML = '';
@@ -499,46 +675,46 @@ class CreaturesGame {
     }
 
     setRollBtnState() {
+        if (this.destroyed) return;
         const btn = document.getElementById('snl-roll-btn');
         const p = this.currentPlayer;
-        btn.disabled = this.busy || this.over || p.isAI;
+        const mpBlock = this.mpMode && this.myPlayerIdx !== this.currentIdx;
+        btn.disabled = this.busy || this.over || p.isAI || mpBlock;
     }
 
     /* ── Roll ── */
     async roll() {
         if (this.busy || this.over) return;
         if (this.currentPlayer.isAI) return;
-        await this._doRoll();
+        if (this.mpMode && this.myPlayerIdx !== this.currentIdx) return;
+        const result = Math.floor(Math.random() * 6) + 1;
+        // In MP mode, send the roll to peer before animating
+        if (this.mpMode && this.mpConn) {
+            try { this.mpConn.send({ type: 'snl-roll', result }); } catch (_) {}
+        }
+        await this._doRoll(result);
     }
 
-    async _doRoll() {
+    async _doRoll(predeterminedResult) {
+        if (this.busy) return;
         this.busy = true;
         this.setRollBtnState();
         sound.playDice();
 
-        const diceEl = document.getElementById('snl-dice');
-        diceEl.classList.add('dice-rolling');
-        diceEl.classList.remove('dice-land');
+        // Determine result
+        const result = (predeterminedResult !== undefined)
+            ? predeterminedResult
+            : Math.floor(Math.random() * 6) + 1;
 
-        const result = await new Promise(resolve => {
-            let count = 0;
-            const iv = setInterval(() => {
-                diceEl.textContent = DICE_FACES[Math.floor(Math.random() * 6)];
-                count++;
-                if (count >= 13) {
-                    clearInterval(iv);
-                    const r = Math.floor(Math.random() * 6) + 1;
-                    diceEl.textContent = DICE_FACES[r - 1];
-                    resolve(r);
-                }
-            }, 70);
-        });
-
-        diceEl.classList.remove('dice-rolling');
-        diceEl.classList.add('dice-land');
-        setTimeout(() => diceEl.classList.remove('dice-land'), 400);
-
-        await this._movePlayer(result);
+        try {
+            // Animate 3D dice
+            await rollDice3D(result);
+            await this._movePlayer(result);
+        } catch (err) {
+            // On any unexpected error, recover by resetting and advancing turn
+            this.busy = false;
+            this.setRollBtnState();
+        }
     }
 
     async _movePlayer(steps) {
@@ -548,18 +724,23 @@ class CreaturesGame {
         if (newPos > 100) {
             this.setMessage(`Need ${100 - player.position} or less! Stay at ${player.position || 'Start'}.`);
             await this._sleep(900);
-            this.busy = false;
             this._nextTurn();
             return;
         }
 
+        // Show ghost/shadow token at destination before movement begins
+        this._showGhostToken(this.currentIdx, newPos);
+        await this._sleep(700);
+        this._clearGhostToken();
+
         // Step-by-step movement
         const from = player.position;
+        const stepDelay = getStepDelay();
         for (let pos = from + 1; pos <= newPos; pos++) {
             player.position = pos;
             this._placeToken(this.currentIdx);
             sound.playStep();
-            await this._sleep(170);
+            await this._sleep(stepDelay);
         }
 
         // Check win first
@@ -569,10 +750,13 @@ class CreaturesGame {
         }
 
         // Check hazard
-        if (SNL_HAZARDS[player.position]) {
-            const dest = SNL_HAZARDS[player.position];
+        if (getSNLHazards()[player.position]) {
+            const dest = getSNLHazards()[player.position];
             const a = ANIMALS[this.animalKey];
-            this.setMessage(`${a.emoji} Oh no! ${a.name} slide you to ${dest}!`);
+            const msg = currentAgeGroup === 'age-tiny'
+                ? `${a.emoji} Oh no! Go back to ${dest}!`
+                : `${a.emoji} Oh no! ${a.name} slide you to ${dest}!`;
+            this.setMessage(msg);
             sound.playAnimal(this.animalKey);
             const container = document.getElementById('snl-board-container');
             container.classList.add('board-shake');
@@ -582,9 +766,12 @@ class CreaturesGame {
             this._placeToken(this.currentIdx);
             await this._sleep(400);
 
-        } else if (SNL_LADDERS[player.position]) {
-            const dest = SNL_LADDERS[player.position];
-            this.setMessage(`🪜 Lucky! Ladder up to ${dest}!`);
+        } else if (getSNLLadders()[player.position]) {
+            const dest = getSNLLadders()[player.position];
+            const msg = currentAgeGroup === 'age-tiny'
+                ? `🪜 Yay! Move forward to ${dest}!`
+                : `🪜 Lucky! Ladder up to ${dest}!`;
+            this.setMessage(msg);
             sound.playLadder();
             await this._sleep(700);
             player.position = dest;
@@ -607,12 +794,12 @@ class CreaturesGame {
             return;
         }
 
-        this.busy = false;
         this._nextTurn();
     }
 
     async _handleWin() {
         this.over = true;
+        this.busy = false;
         const p = this.currentPlayer;
         p.won = true;
         this.setMessage(`🏆 ${p.name} wins! Amazing!`);
@@ -625,6 +812,7 @@ class CreaturesGame {
     }
 
     _nextTurn() {
+        this.busy = false;
         this.currentIdx = (this.currentIdx + 1) % this.players.length;
         this._updateActiveToken();
         this.updatePlayersPanel();
@@ -632,10 +820,26 @@ class CreaturesGame {
         this.setRollBtnState();
 
         if (this.players[this.currentIdx].isAI && !this.over) {
+            const diff = this.aiDifficulty || 'medium';
+            let delay = 1100;
+            if (diff === 'easy') delay = 1400;
+            else if (diff === 'hard') delay = 700;
+
+            // Easy: 30% chance to skip turn
+            if (diff === 'easy' && Math.random() < 0.30) {
+                this.setMessage('🤖 Computer is thinking...');
+                this._aiTimer = setTimeout(() => {
+                    this._aiTimer = null;
+                    this.busy = false;
+                    this._nextTurn(); // skip
+                }, delay);
+                return;
+            }
+
             this._aiTimer = setTimeout(() => {
                 this._aiTimer = null;
                 this._doRoll();
-            }, 1100);
+            }, delay);
         }
     }
 }
@@ -728,6 +932,7 @@ document.getElementById('snl-start-btn').addEventListener('click', () => {
 
     if (snlGame) snlGame.destroy();
     snlGame = new CreaturesGame(configs, snlAnimal);
+    snlGame.aiDifficulty = safeStorage.getItem('snlAiDifficulty') || 'medium';
 
     document.getElementById('snl-setup').classList.add('hidden');
     document.getElementById('snl-game-screen').classList.remove('hidden');
@@ -755,10 +960,241 @@ document.getElementById('snl-roll-btn').addEventListener('click', () => {
 
 // Back to setup
 document.getElementById('snl-back-btn').addEventListener('click', () => {
-    if (snlGame) { snlGame.destroy(); snlGame = null; }
+    if (snlGame) {
+        snlGame.destroy();
+        // Close any MP connection
+        if (snlGame.mpConn) { try { snlGame.mpConn.close(); } catch (_) {} }
+        snlGame = null;
+    }
+    snlDestroyPeer();
     document.getElementById('snl-game-screen').classList.add('hidden');
     document.getElementById('snl-setup').classList.remove('hidden');
 });
+
+/* ═══════════════════════════════════════════════════════════════
+   SNL — S&L MULTIPLAYER (PeerJS)
+═══════════════════════════════════════════════════════════════ */
+let snlPeer = null;
+let snlConn = null;
+
+function snlDestroyPeer() {
+    if (snlConn) { try { snlConn.close(); } catch (_) {} snlConn = null; }
+    if (snlPeer) { try { snlPeer.destroy(); } catch (_) {} snlPeer = null; }
+}
+
+function snlSetMpStatus(text, type) {
+    const el = document.getElementById('snl-mp-status-text');
+    if (!el) return;
+    el.textContent = text;
+    el.className = `mp-status${type ? ' ' + type : ''}`;
+}
+
+function openSnlMpOverlay() {
+    const overlay = document.getElementById('snl-mp-overlay');
+    if (!overlay) return;
+    overlay.classList.remove('hidden');
+    document.getElementById('snl-mp-lobby').classList.remove('hidden');
+    document.getElementById('snl-mp-waiting').classList.add('hidden');
+    snlSetMpStatus('');
+    const inp = document.getElementById('snl-mp-code-input');
+    if (inp) inp.value = '';
+}
+
+function closeSnlMpOverlay() {
+    const overlay = document.getElementById('snl-mp-overlay');
+    if (overlay) overlay.classList.add('hidden');
+}
+
+function startSnlMultiplayerGame(myIdx) {
+    closeSnlMpOverlay();
+
+    // Build a 2-player game (host = P1/idx 0, guest = P2/idx 1)
+    const hostName = (document.querySelector('.snl-name-input') || {}).value || 'Player 1';
+    const configs = [
+        { name: hostName.trim() || 'Player 1', isAI: false },
+        { name: 'Online Player', isAI: false },
+    ];
+
+    if (snlGame) snlGame.destroy();
+    snlGame = new CreaturesGame(configs, snlAnimal);
+    snlGame.mpMode = true;
+    snlGame.myPlayerIdx = myIdx;
+    snlGame.mpConn = snlConn;
+    snlGame.aiDifficulty = safeStorage.getItem('snlAiDifficulty') || 'medium';
+
+    document.getElementById('snl-setup').classList.add('hidden');
+    document.getElementById('snl-game-screen').classList.remove('hidden');
+
+    snlGame.buildBoard();
+    snlGame.setTurnDisplay();
+    snlGame.setMessage(myIdx === 0 ? "Your turn! Roll the dice!" : "Waiting for opponent to roll...");
+    snlGame.updatePlayersPanel();
+    snlGame.setRollBtnState();
+    snlGame._updateActiveToken();
+}
+
+function setupSnlConnHandlers(connection, isHost) {
+    snlConn = connection;
+
+    if (!isHost) {
+        // Guest side: wait for connection open, then start game
+        connection.on('open', () => {
+            snlSetMpStatus('Connected!', 'connected');
+            const hint = document.getElementById('snl-mp-hint');
+            if (hint) hint.textContent = 'Connected! Starting game...';
+            setTimeout(() => startSnlMultiplayerGame(1), 700);
+        });
+    }
+
+    connection.on('data', (data) => {
+        if (!snlGame || !snlGame.mpMode) return;
+        if (data.type === 'snl-roll') {
+            if (typeof data.result === 'number' && data.result >= 1 && data.result <= 6) {
+                if (!snlGame.busy && !snlGame.over) {
+                    snlGame._doRoll(data.result);
+                }
+            }
+        } else if (data.type === 'snl-reset') {
+            const myIdx = snlGame ? snlGame.myPlayerIdx : (isHost ? 0 : 1);
+            if (snlGame) snlGame.destroy();
+            startSnlMultiplayerGame(myIdx);
+        }
+    });
+
+    connection.on('close', () => {
+        if (snlGame && snlGame.mpMode) {
+            snlGame.setMessage('Opponent disconnected.');
+            snlGame.mpMode = false;
+            snlGame.mpConn = null;
+            snlGame.setRollBtnState();
+        }
+        snlConn = null;
+    });
+
+    connection.on('error', (err) => {
+        snlSetMpStatus(`Error: ${err.type}`, 'error');
+    });
+}
+
+// Open MP overlay button
+const snlMpOpenBtn = document.getElementById('snl-mp-open-btn');
+if (snlMpOpenBtn) {
+    snlMpOpenBtn.addEventListener('click', openSnlMpOverlay);
+}
+
+// Close MP overlay
+const snlMpCloseBtn = document.getElementById('snl-mp-close');
+if (snlMpCloseBtn) {
+    snlMpCloseBtn.addEventListener('click', () => {
+        closeSnlMpOverlay();
+        snlDestroyPeer();
+    });
+}
+
+const snlMpOverlay = document.getElementById('snl-mp-overlay');
+if (snlMpOverlay) {
+    snlMpOverlay.addEventListener('click', (e) => {
+        if (e.target === snlMpOverlay) {
+            closeSnlMpOverlay();
+            snlDestroyPeer();
+        }
+    });
+}
+
+// Create game room
+const snlMpCreateBtn = document.getElementById('snl-mp-create');
+if (snlMpCreateBtn) {
+    snlMpCreateBtn.addEventListener('click', () => {
+        snlDestroyPeer();
+        document.getElementById('snl-mp-lobby').classList.add('hidden');
+        document.getElementById('snl-mp-waiting').classList.remove('hidden');
+        document.getElementById('snl-mp-room-code').textContent = '—';
+        const hint = document.getElementById('snl-mp-hint');
+        if (hint) hint.textContent = 'Connecting to server...';
+        snlSetMpStatus('');
+        const snlMpCopyBtn = document.getElementById('snl-mp-copy');
+        if (snlMpCopyBtn) snlMpCopyBtn.disabled = true;
+
+        const roomCode = generateSnlRoomCode();
+        snlPeer = new Peer(roomCode);
+
+        snlPeer.on('open', (id) => {
+            document.getElementById('snl-mp-room-code').textContent = id;
+            if (hint) hint.textContent = 'Waiting for a friend to join...';
+            if (snlMpCopyBtn) snlMpCopyBtn.disabled = false;
+        });
+
+        snlPeer.on('connection', (connection) => {
+            if (snlConn) { connection.close(); return; }
+            if (hint) hint.textContent = 'Friend connected! Starting game...';
+            setupSnlConnHandlers(connection, true);
+            // Host is player index 0 — start after connection opens
+            connection.on('open', () => {
+                setTimeout(() => startSnlMultiplayerGame(0), 700);
+            });
+        });
+
+        snlPeer.on('error', (err) => {
+            if (err.type === 'unavailable-id') {
+                snlPeer.destroy();
+                snlMpCreateBtn.click();
+                return;
+            }
+            snlSetMpStatus(`Error: ${err.type}`, 'error');
+            document.getElementById('snl-mp-lobby').classList.remove('hidden');
+            document.getElementById('snl-mp-waiting').classList.add('hidden');
+        });
+    });
+}
+
+// Copy room code
+const snlMpCopyBtn = document.getElementById('snl-mp-copy');
+if (snlMpCopyBtn) {
+    snlMpCopyBtn.addEventListener('click', () => {
+        const code = document.getElementById('snl-mp-room-code').textContent;
+        if (code && code !== '—') {
+            navigator.clipboard.writeText(code).then(() => {
+                snlMpCopyBtn.textContent = 'Copied!';
+                setTimeout(() => { snlMpCopyBtn.textContent = 'Copy'; }, 2000);
+            });
+        }
+    });
+}
+
+// Join game room
+const snlMpJoinBtn = document.getElementById('snl-mp-join');
+if (snlMpJoinBtn) {
+    snlMpJoinBtn.addEventListener('click', () => {
+        const inp = document.getElementById('snl-mp-code-input');
+        const code = (inp ? inp.value.trim().toUpperCase() : '');
+        if (!code) return;
+        snlMpJoinBtn.disabled = true;
+        snlDestroyPeer();
+        snlSetMpStatus('Connecting...', '');
+        snlPeer = new Peer();
+        snlPeer.on('open', () => {
+            const c = snlPeer.connect(code, { reliable: true });
+            setupSnlConnHandlers(c, false);
+        });
+        snlPeer.on('error', (err) => {
+            snlSetMpStatus(`Error: ${err.type}`, 'error');
+            snlMpJoinBtn.disabled = false;
+        });
+    });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SNL AI DIFFICULTY SETTING
+═══════════════════════════════════════════════════════════════ */
+const snlDifficultySelect = document.getElementById('snl-difficulty-select');
+if (snlDifficultySelect) {
+    snlDifficultySelect.value = safeStorage.getItem('snlAiDifficulty') || 'medium';
+    snlDifficultySelect.addEventListener('change', () => {
+        const val = snlDifficultySelect.value;
+        safeStorage.setItem('snlAiDifficulty', val);
+        if (snlGame) snlGame.aiDifficulty = val;
+    });
+}
 
 /* ═══════════════════════════════════════════════════════════════
    TIC-TAC-TOE
@@ -784,7 +1220,7 @@ let moveHistory = [];
 let aiTimeoutId = null;
 let autoAdvanceIntervalId = null;
 let autoAdvanceTimeoutId = null;
-let aiDifficulty = localStorage.getItem('aiDifficulty') || 'easy';
+let aiDifficulty = safeStorage.getItem('aiDifficulty') || 'easy';
 
 let multiplayerMode = false;
 let peer = null;
@@ -793,14 +1229,14 @@ let myRole = null;
 
 function loadPlayerNames() {
     let saved = null;
-    try { saved = JSON.parse(localStorage.getItem('playerNames') || 'null'); } catch { saved = null; }
+    try { saved = JSON.parse(safeStorage.getItem('playerNames') || 'null'); } catch { saved = null; }
     return { X: sanitizePlayerName(saved?.X, 'X'), O: sanitizePlayerName(saved?.O, 'O') };
 }
 
 let playerNames = loadPlayerNames();
 
 let savedScores = null;
-try { savedScores = JSON.parse(localStorage.getItem('scores') || 'null'); } catch { savedScores = null; }
+try { savedScores = JSON.parse(safeStorage.getItem('scores') || 'null'); } catch { savedScores = null; }
 const scores = {
     X:    Number.isInteger(savedScores?.X)    ? savedScores.X    : 0,
     O:    Number.isInteger(savedScores?.O)    ? savedScores.O    : 0,
@@ -824,7 +1260,7 @@ function getPlayerName(player) {
     return playerNames[player];
 }
 
-function persistPlayerNames() { localStorage.setItem('playerNames', JSON.stringify(playerNames)); }
+function persistPlayerNames() { safeStorage.setItem('playerNames', JSON.stringify(playerNames)); }
 
 function updateNameDisplay() {
     scoreLabelX.textContent = getPlayerName('X');
@@ -1033,7 +1469,7 @@ function updateScoreDisplay() {
     document.getElementById('score-x').textContent    = scores.X;
     document.getElementById('score-o').textContent    = scores.O;
     document.getElementById('score-draw').textContent = scores.draw;
-    localStorage.setItem('scores', JSON.stringify(scores));
+    safeStorage.setItem('scores', JSON.stringify(scores));
 }
 
 function resetBoardVisuals() {
@@ -1146,10 +1582,10 @@ playerONameInput.addEventListener('change', () => { savePlayerName('O', playerON
 
 darkModeToggle.addEventListener('change', () => {
     document.body.classList.toggle('dark-mode', darkModeToggle.checked);
-    localStorage.setItem('darkMode', darkModeToggle.checked);
+    safeStorage.setItem('darkMode', darkModeToggle.checked);
 });
 
-if (localStorage.getItem('darkMode') === 'true') {
+if (safeStorage.getItem('darkMode') === 'true') {
     darkModeToggle.checked = true;
     document.body.classList.add('dark-mode');
 }
@@ -1157,7 +1593,7 @@ if (localStorage.getItem('darkMode') === 'true') {
 difficultySelect.value = aiDifficulty;
 difficultySelect.addEventListener('change', () => {
     aiDifficulty = difficultySelect.value;
-    localStorage.setItem('aiDifficulty', aiDifficulty);
+    safeStorage.setItem('aiDifficulty', aiDifficulty);
 });
 
 // Multiplayer (PeerJS WebRTC)
@@ -1340,11 +1776,9 @@ muteBtn.addEventListener('click', () => {
 ═══════════════════════════════════════════════════════════════ */
 function openHtp(overlayId) {
     document.getElementById(overlayId).classList.remove('hidden');
-    document.body.style.overflow = 'hidden';
 }
 function closeHtp(overlayId) {
     document.getElementById(overlayId).classList.add('hidden');
-    document.body.style.overflow = '';
 }
 
 document.getElementById('snl-how-to-play-btn').addEventListener('click', () => openHtp('snl-htp-overlay'));
@@ -1956,4 +2390,356 @@ class MakeoverGame {
 let makeoverGame = null;
 document.getElementById('tab-mkv').addEventListener('click', () => {
     if (!makeoverGame) makeoverGame = new MakeoverGame();
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   NAIL ART STUDIO
+═══════════════════════════════════════════════════════════════ */
+class NailArtStudio {
+    constructor() {
+        this.selectedColor   = '#ff6eb4';
+        this.selectedColor2  = '#c77dff';
+        this.gradientDir     = 'vertical';
+        this.selectedPattern = 'stripes';
+        this.selectedSticker = '⭐';
+        this.selectedTool    = 'color';
+        this.nailStates = Array.from({length: 5}, () => ({fill: '#f3f4f6'}));
+
+        this._labels = ['Thumb','Index','Middle','Ring','Pinky'];
+        this._widths = [110, 100, 108, 96, 80]; // CSS px
+
+        this._buildNails();
+        this._buildPalettes();
+        this._bindTools();
+        this._bindPatterns();
+        this._bindStickers();
+        this._bindGradientDir();
+        this._bindButtons();
+        this._updateToolUI();
+    }
+
+    get _palette() {
+        return [
+            '#ff6eb4','#ff9ed2','#c77dff','#a0c4ff',
+            '#ffd166','#ff6b6b','#06d6a0','#f4a261',
+            '#e63946','#ffffff','#ffb3c6','#b5ead7',
+            '#f9c74f','#90e0ef','#a8dadc','#e63b7a',
+            '#1e293b','#8B4513','#7c3aed','#10b981'
+        ];
+    }
+
+    /* ── Build five nail SVGs ─────────────────────────── */
+    _buildNails() {
+        const NS  = 'http://www.w3.org/2000/svg';
+        const row = document.getElementById('nas-nails-row');
+        row.innerHTML = '';
+
+        // Universal nail shape + sheen in viewBox 0 0 100 160
+        const NAIL  = 'M 18,112 Q 18,10 50,10 Q 82,10 82,112 L 77,143 Q 50,152 23,143 Z';
+        const SHEEN = 'M 26,18 Q 38,12 50,15 Q 44,52 33,50 Q 22,47 26,18 Z';
+
+        this._labels.forEach((label, i) => {
+            const wrap = document.createElement('div');
+            wrap.className = 'nas-nail-wrap';
+            wrap.dataset.nail = i;
+            wrap.style.width = this._widths[i] + 'px';
+
+            const svg = document.createElementNS(NS, 'svg');
+            svg.setAttribute('viewBox', '0 0 100 160');
+            svg.setAttribute('class', 'nas-nail-svg');
+            svg.setAttribute('role', 'button');
+            svg.setAttribute('tabindex', '0');
+            svg.setAttribute('aria-label', label + ' nail');
+
+            // defs: clip + gradient
+            const defs = document.createElementNS(NS, 'defs');
+
+            const clip = document.createElementNS(NS, 'clipPath');
+            clip.id = `nas-clip-${i}`;
+            const cp = document.createElementNS(NS, 'path');
+            cp.setAttribute('d', NAIL);
+            clip.appendChild(cp);
+            defs.appendChild(clip);
+
+            const grad = document.createElementNS(NS, 'linearGradient');
+            grad.id = `nas-grad-${i}`;
+            grad.setAttribute('x1','0'); grad.setAttribute('y1','0');
+            grad.setAttribute('x2','0'); grad.setAttribute('y2','1');
+            ['#f3f4f6','#f3f4f6'].forEach((c, si) => {
+                const s = document.createElementNS(NS, 'stop');
+                s.setAttribute('offset', si === 0 ? '0%' : '100%');
+                s.setAttribute('stop-color', c);
+                grad.appendChild(s);
+            });
+            defs.appendChild(grad);
+            svg.appendChild(defs);
+
+            // Base shape
+            const base = document.createElementNS(NS, 'path');
+            base.setAttribute('d', NAIL);
+            base.setAttribute('fill', '#f3f4f6');
+            base.setAttribute('stroke', '#d1d5db');
+            base.setAttribute('stroke-width', '1.5');
+            base.setAttribute('class', 'nas-nail-base');
+            svg.appendChild(base);
+
+            // Art layer (clipped)
+            const layer = document.createElementNS(NS, 'g');
+            layer.setAttribute('class', 'nas-art-layer');
+            layer.setAttribute('clip-path', `url(#nas-clip-${i})`);
+            layer.setAttribute('pointer-events', 'none');
+            svg.appendChild(layer);
+
+            // Sheen highlight
+            const sheen = document.createElementNS(NS, 'path');
+            sheen.setAttribute('d', SHEEN);
+            sheen.setAttribute('fill', 'white');
+            sheen.setAttribute('opacity', '0.22');
+            sheen.setAttribute('pointer-events', 'none');
+            svg.appendChild(sheen);
+
+            wrap.appendChild(svg);
+
+            const lbl = document.createElement('span');
+            lbl.className = 'nas-nail-label';
+            lbl.textContent = label;
+            wrap.appendChild(lbl);
+
+            wrap.addEventListener('click', () => this._applyTool(i));
+            svg.addEventListener('keydown', e => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this._applyTool(i); }
+            });
+
+            row.appendChild(wrap);
+        });
+    }
+
+    /* ── Colour palettes (primary + secondary) ───────── */
+    _buildPalettes() {
+        ['nas-palette1','nas-palette2'].forEach((cid, palIdx) => {
+            const container = document.getElementById(cid);
+            container.innerHTML = '';
+            this._palette.forEach((color, i) => {
+                const btn = document.createElement('button');
+                btn.className = 'nas-swatch';
+                btn.style.backgroundColor = color;
+                btn.setAttribute('aria-label', `Color ${i + 1}`);
+                if (palIdx === 0 && i === 0) btn.classList.add('active');
+                if (palIdx === 1 && i === 2) btn.classList.add('active');
+                btn.addEventListener('click', () => {
+                    if (palIdx === 0) this.selectedColor  = color;
+                    else              this.selectedColor2 = color;
+                    container.querySelectorAll('.nas-swatch').forEach(s =>
+                        s.classList.toggle('active', s === btn));
+                });
+                container.appendChild(btn);
+            });
+        });
+    }
+
+    /* ── Tool picker ──────────────────────────────────── */
+    _bindTools() {
+        document.querySelectorAll('.nas-tool-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.selectedTool = btn.dataset.tool;
+                document.querySelectorAll('.nas-tool-btn').forEach(b =>
+                    b.classList.toggle('active', b === btn));
+                this._updateToolUI();
+            });
+        });
+    }
+
+    _updateToolUI() {
+        const t = this.selectedTool;
+        document.getElementById('nas-color2-row').classList.toggle('hidden', t !== 'gradient');
+        document.getElementById('nas-pattern-row').classList.toggle('hidden', t !== 'pattern');
+        document.getElementById('nas-sticker-row').classList.toggle('hidden', t !== 'sticker');
+        document.getElementById('nas-col1-label').textContent =
+            t === 'gradient' ? 'Color 1:' : 'Color:';
+    }
+
+    /* ── Pattern / sticker / dir pickers ─────────────── */
+    _bindPatterns() {
+        document.querySelectorAll('.nas-pat-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.selectedPattern = btn.dataset.pat;
+                document.querySelectorAll('.nas-pat-btn').forEach(b =>
+                    b.classList.toggle('active', b === btn));
+            });
+        });
+    }
+
+    _bindStickers() {
+        document.querySelectorAll('.nas-stk-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.selectedSticker = btn.dataset.stk;
+                document.querySelectorAll('.nas-stk-btn').forEach(b =>
+                    b.classList.toggle('active', b === btn));
+            });
+        });
+    }
+
+    _bindGradientDir() {
+        document.querySelectorAll('.nas-dir-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.gradientDir = btn.dataset.dir;
+                document.querySelectorAll('.nas-dir-btn').forEach(b =>
+                    b.classList.toggle('active', b === btn));
+            });
+        });
+    }
+
+    /* ── Apply active tool to nail i ─────────────────── */
+    _applyTool(i) {
+        const NS   = 'http://www.w3.org/2000/svg';
+        const wrap = document.querySelector(`.nas-nail-wrap[data-nail="${i}"]`);
+        const svg  = wrap.querySelector('.nas-nail-svg');
+        const base = svg.querySelector('.nas-nail-base');
+        const layer = svg.querySelector('.nas-art-layer');
+
+        const mk = (tag, attrs) => {
+            const el = document.createElementNS(NS, tag);
+            Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v));
+            return el;
+        };
+
+        if (this.selectedTool === 'clear') {
+            base.setAttribute('fill', '#f3f4f6');
+            base.setAttribute('stroke', '#d1d5db');
+            layer.innerHTML = '';
+            this.nailStates[i] = {fill: '#f3f4f6'};
+
+        } else if (this.selectedTool === 'color') {
+            base.setAttribute('fill', this.selectedColor);
+            base.setAttribute('stroke', this._darken(this.selectedColor));
+            this.nailStates[i].fill = this.selectedColor;
+
+        } else if (this.selectedTool === 'gradient') {
+            const grad = svg.querySelector(`#nas-grad-${i}`);
+            const stops = grad.querySelectorAll('stop');
+            const dirs = {vertical: [0,0,0,1], horizontal: [0,0,1,0], diagonal: [0,0,1,1]};
+            const [x1,y1,x2,y2] = dirs[this.gradientDir];
+            grad.setAttribute('x1', x1); grad.setAttribute('y1', y1);
+            grad.setAttribute('x2', x2); grad.setAttribute('y2', y2);
+            stops[0].setAttribute('stop-color', this.selectedColor);
+            stops[1].setAttribute('stop-color', this.selectedColor2);
+            base.setAttribute('fill', `url(#nas-grad-${i})`);
+            base.setAttribute('stroke', this._darken(this.selectedColor));
+            this.nailStates[i].fill = 'gradient';
+
+        } else if (this.selectedTool === 'pattern') {
+            layer.querySelectorAll('.nas-pat-el').forEach(el => el.remove());
+            const c = this.selectedColor;
+            const pat = this.selectedPattern;
+
+            if (pat === 'stripes') {
+                for (let y = 0; y < 160; y += 14)
+                    layer.appendChild(mk('rect', {x:0, y, width:100, height:6, fill:c, opacity:'0.45', class:'nas-pat-el'}));
+
+            } else if (pat === 'dots') {
+                for (let row = 0; row <= 8; row++)
+                    for (let col = 0; col <= 5; col++)
+                        layer.appendChild(mk('circle', {cx: 8+col*16, cy: 12+row*18, r:5, fill:c, opacity:'0.55', class:'nas-pat-el'}));
+
+            } else if (pat === 'checker') {
+                for (let row = 0; row < 9; row++)
+                    for (let col = 0; col < 7; col++)
+                        if ((row+col)%2===0)
+                            layer.appendChild(mk('rect', {x:col*16, y:row*18, width:16, height:18, fill:c, opacity:'0.42', class:'nas-pat-el'}));
+
+            } else if (pat === 'waves') {
+                for (let y = 14; y <= 160; y += 22) {
+                    const path = document.createElementNS(NS, 'path');
+                    path.setAttribute('d', `M 0,${y} Q 25,${y-10} 50,${y} Q 75,${y+10} 100,${y}`);
+                    path.setAttribute('fill', 'none');
+                    path.setAttribute('stroke', c);
+                    path.setAttribute('stroke-width', '4');
+                    path.setAttribute('opacity', '0.55');
+                    path.setAttribute('class', 'nas-pat-el');
+                    layer.appendChild(path);
+                }
+
+            } else if (pat === 'diamonds') {
+                for (let row = 0; row <= 6; row++)
+                    for (let col = 0; col <= 4; col++) {
+                        const cx = 8 + col*20 + (row%2===0?0:10), cy = 15+row*22;
+                        layer.appendChild(mk('polygon', {
+                            points:`${cx},${cy-9} ${cx+8},${cy} ${cx},${cy+9} ${cx-8},${cy}`,
+                            fill:c, opacity:'0.5', class:'nas-pat-el'
+                        }));
+                    }
+
+            } else if (pat === 'flowers') {
+                [[50,30],[25,65],[75,65],[35,105],[65,105],[50,138]].forEach(([cx,cy]) => {
+                    for (let p = 0; p < 5; p++) {
+                        const a = (p*Math.PI*2/5) - Math.PI/2;
+                        layer.appendChild(mk('circle', {cx: cx+10*Math.cos(a), cy: cy+10*Math.sin(a), r:5.5, fill:c, opacity:'0.5', class:'nas-pat-el'}));
+                    }
+                    layer.appendChild(mk('circle', {cx, cy, r:4, fill:'white', opacity:'0.7', class:'nas-pat-el'}));
+                });
+            }
+
+        } else if (this.selectedTool === 'sticker') {
+            const tx = document.createElementNS(NS, 'text');
+            tx.setAttribute('x', 20 + Math.random() * 55);
+            tx.setAttribute('y', 28 + Math.random() * 98);
+            tx.setAttribute('font-size', '20');
+            tx.setAttribute('text-anchor', 'middle');
+            tx.setAttribute('dominant-baseline', 'middle');
+            layer.appendChild(tx);
+            tx.textContent = this.selectedSticker;
+        }
+
+        this._sparkle(wrap);
+        this._playPop();
+    }
+
+    /* ── Helpers ──────────────────────────────────────── */
+    _sparkle(el) {
+        el.classList.add('mkv-sparkle-pop');
+        setTimeout(() => el.classList.remove('mkv-sparkle-pop'), 450);
+    }
+
+    _playPop() {
+        try { sound._note(880, 'sine', 0.12, 0.18); } catch(e) {}
+    }
+
+    _darken(hex) {
+        const n = parseInt(hex.replace('#',''), 16);
+        const r = Math.max(0, (n>>16)-30);
+        const g = Math.max(0, ((n>>8)&0xff)-30);
+        const b = Math.max(0, (n&0xff)-30);
+        return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+    }
+
+    /* ── Action buttons ───────────────────────────────── */
+    _bindButtons() {
+        document.getElementById('nas-done-btn').addEventListener('click', () => {
+            document.getElementById('nas-celebration').classList.remove('hidden');
+            launchBigConfetti();
+            try { sound.playWin(); } catch(e) {}
+        });
+
+        ['nas-clear-all-btn','nas-reset-btn'].forEach(id => {
+            document.getElementById(id).addEventListener('click', () => this._reset());
+        });
+    }
+
+    _reset() {
+        this.nailStates = Array.from({length: 5}, () => ({fill: '#f3f4f6'}));
+        document.querySelectorAll('.nas-nail-wrap').forEach((wrap, i) => {
+            const svg = wrap.querySelector('.nas-nail-svg');
+            svg.querySelector('.nas-nail-base').setAttribute('fill', '#f3f4f6');
+            svg.querySelector('.nas-nail-base').setAttribute('stroke', '#d1d5db');
+            svg.querySelector('.nas-art-layer').innerHTML = '';
+            const stops = svg.querySelectorAll(`#nas-grad-${i} stop`);
+            stops.forEach(s => s.setAttribute('stop-color', '#f3f4f6'));
+        });
+        document.getElementById('nas-celebration').classList.add('hidden');
+    }
+}
+
+let nailArtStudio = null;
+document.getElementById('tab-nas').addEventListener('click', () => {
+    if (!nailArtStudio) nailArtStudio = new NailArtStudio();
 });

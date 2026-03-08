@@ -5,18 +5,34 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🎮 Kids Game Zone</title>
     <link rel="stylesheet" href="style.css">
-    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js" async></script>
 </head>
 <body>
 
 <!-- Full-screen confetti overlay -->
 <div id="confetti-container" aria-hidden="true"></div>
 
+<!-- Age Selector Bar -->
+<div id="age-bar">
+    <span class="age-bar-label">🎂 My age:</span>
+    <div class="age-pills">
+        <button class="age-pill" data-age="5">5</button>
+        <button class="age-pill" data-age="6">6</button>
+        <button class="age-pill" data-age="7">7</button>
+        <button class="age-pill" data-age="8">8</button>
+        <button class="age-pill" data-age="9">9</button>
+        <button class="age-pill" data-age="10">10</button>
+        <button class="age-pill" data-age="11">11</button>
+        <button class="age-pill" data-age="12plus">12+</button>
+    </div>
+</div>
+
 <!-- Tab Navigation -->
 <nav id="tab-bar">
     <button class="tab-btn active" data-tab="snl" id="tab-snl">🎲 <span id="tab-snl-label">Creatures &amp; Ladders</span></button>
     <button class="tab-btn" data-tab="ttt" id="tab-ttt">❌ Tic-Tac-Toe</button>
     <button class="tab-btn" data-tab="mkv" id="tab-mkv">💅 Princess Makeover</button>
+    <button class="tab-btn" data-tab="nas" id="tab-nas">🎨 Nail Art Studio</button>
     <button id="mute-btn" class="mute-btn" aria-label="Mute sounds" title="Mute / Unmute sounds">🔊</button>
 </nav>
 
@@ -55,31 +71,77 @@
                 <div id="snl-player-configs"></div>
             </div>
 
-            <button id="snl-start-btn" class="big-btn">🚀 Let's Play!</button>
+            <div class="snl-start-row">
+                <button id="snl-start-btn" class="big-btn">🚀 Let's Play!</button>
+                <button id="snl-mp-open-btn" class="big-btn snl-mp-open-btn">🌐 Play Online</button>
+            </div>
         </div>
 
         <!-- Game Screen -->
         <div id="snl-game-screen" class="hidden">
 
-            <div id="snl-game-header">
-                <h2 id="snl-turn-display">Player 1's Turn!</h2>
-                <p id="snl-message" aria-live="polite"></p>
+            <div id="snl-game-layout">
+                <div id="snl-board-area">
+                    <div id="snl-game-header">
+                        <h2 id="snl-turn-display">Player 1's Turn!</h2>
+                        <p id="snl-message" aria-live="polite"></p>
+                    </div>
+
+                    <div id="snl-board-container" aria-label="Game board">
+                        <div id="snl-board"></div>
+                        <svg id="snl-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
+                        <div id="snl-tokens" aria-hidden="true"></div>
+                    </div>
+                </div>
+
+                <div id="snl-sidebar">
+                    <div id="snl-dice-section">
+                        <!-- 3D CSS Dice -->
+                        <div id="snl-dice-3d" class="dice-3d-wrap" role="img" aria-label="Dice">
+                            <div class="dice-cube" id="dice-cube">
+                                <div class="dice-face face-1">
+                                    <span class="dot"></span>
+                                </div>
+                                <div class="dice-face face-2">
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                </div>
+                                <div class="dice-face face-3">
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                </div>
+                                <div class="dice-face face-4">
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                </div>
+                                <div class="dice-face face-5">
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                </div>
+                                <div class="dice-face face-6">
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                    <span class="dot"></span>
+                                </div>
+                            </div>
+                        </div>
+                        <button id="snl-roll-btn" class="big-btn">🎲 Roll!</button>
+                    </div>
+
+                    <div id="snl-players-status"></div>
+
+                    <button id="snl-back-btn" class="secondary-btn">← New Setup</button>
+                </div>
             </div>
-
-            <div id="snl-board-container" aria-label="Game board">
-                <div id="snl-board"></div>
-                <svg id="snl-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
-                <div id="snl-tokens" aria-hidden="true"></div>
-            </div>
-
-            <div id="snl-dice-section">
-                <div id="snl-dice" role="img" aria-label="Dice">⚀</div>
-                <button id="snl-roll-btn" class="big-btn">🎲 Roll!</button>
-            </div>
-
-            <div id="snl-players-status"></div>
-
-            <button id="snl-back-btn" class="secondary-btn">← New Setup</button>
         </div>
     </div>
 
@@ -376,7 +438,7 @@
 
 </main>
 
-<!-- Multiplayer Overlay -->
+<!-- Multiplayer Overlay (TTT) -->
 <div id="mp-overlay" class="hidden">
     <div id="mp-panel" role="dialog" aria-modal="true" aria-labelledby="mp-heading">
         <h2 id="mp-heading">Multiplayer</h2>
@@ -401,6 +463,31 @@
     </div>
 </div>
 
+<!-- S&L Multiplayer Overlay -->
+<div id="snl-mp-overlay" class="mp-overlay hidden">
+    <div id="snl-mp-panel" class="mp-panel" role="dialog" aria-modal="true" aria-labelledby="snl-mp-heading">
+        <h2 id="snl-mp-heading">🌐 Play Online</h2>
+        <div id="snl-mp-lobby">
+            <button id="snl-mp-create">Create Game Room</button>
+            <p class="mp-or">— or —</p>
+            <div class="mp-join-row">
+                <input id="snl-mp-code-input" type="text" placeholder="Enter room code" autocomplete="off" style="text-transform:uppercase">
+                <button id="snl-mp-join">Join!</button>
+            </div>
+        </div>
+        <div id="snl-mp-waiting" class="hidden">
+            <p class="mp-label">Your room code:</p>
+            <div class="mp-code-box">
+                <div id="snl-mp-room-code" style="font-size:1rem;font-weight:900;letter-spacing:0.04em;color:var(--text);flex:1;word-break:break-all;">—</div>
+                <button id="snl-mp-copy">Copy</button>
+            </div>
+            <p id="snl-mp-hint" class="mp-hint-text">Connecting...</p>
+        </div>
+        <p id="snl-mp-status-text" class="mp-status"></p>
+        <button id="snl-mp-close" class="secondary-btn">Close</button>
+    </div>
+</div>
+
 <!-- Settings Overlay -->
 <div id="settings-overlay" class="hidden">
     <div id="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-heading">
@@ -418,6 +505,14 @@
                 <option value="easy">Easy</option>
                 <option value="medium">Medium</option>
                 <option value="hard">Hard</option>
+            </select>
+        </div>
+        <div class="setting-row" id="snl-difficulty-row">
+            <label for="snl-difficulty-select">🎲 S&amp;L AI Level</label>
+            <select id="snl-difficulty-select">
+                <option value="easy">Easy 🐣</option>
+                <option value="medium">Medium 🎯</option>
+                <option value="hard">Hard 🏆</option>
             </select>
         </div>
         <div class="setting-row name-row">
@@ -462,6 +557,90 @@
         </div>
         <button class="htp-close big-btn" id="ttt-htp-close">Got it! Let's play! 🚀</button>
     </div>
+</div>
+
+<!-- NAIL ART STUDIO PANEL -->
+<div id="nas-panel" class="tab-panel hidden">
+  <div id="nas-game">
+    <h1 class="nas-title">🎨 Nail Art Studio</h1>
+    <p class="nas-subtitle">Click a nail, pick your tool, and create your masterpiece!</p>
+
+    <!-- Five large nail canvases (built by JS) -->
+    <div id="nas-nails-row" role="group" aria-label="Nail canvases"></div>
+
+    <!-- Tool selector -->
+    <div class="nas-row">
+      <h2 class="nas-row-label">Tool:</h2>
+      <div id="nas-tools" role="group" aria-label="Active tool">
+        <button class="nas-tool-btn active" data-tool="color">🎨 Color</button>
+        <button class="nas-tool-btn" data-tool="gradient">🌈 Gradient</button>
+        <button class="nas-tool-btn" data-tool="pattern">✦ Pattern</button>
+        <button class="nas-tool-btn" data-tool="sticker">⭐ Sticker</button>
+        <button class="nas-tool-btn" data-tool="clear">🗑 Clear</button>
+      </div>
+    </div>
+
+    <!-- Color 1 (always visible) -->
+    <div class="nas-row">
+      <h2 class="nas-row-label" id="nas-col1-label">Color:</h2>
+      <div id="nas-palette1" role="group" aria-label="Primary colour"></div>
+    </div>
+
+    <!-- Color 2 + direction (gradient tool only) -->
+    <div class="nas-row hidden" id="nas-color2-row">
+      <h2 class="nas-row-label">Color 2:</h2>
+      <div id="nas-palette2" role="group" aria-label="Secondary colour"></div>
+      <div id="nas-grad-dir" role="group" aria-label="Gradient direction">
+        <button class="nas-dir-btn active" data-dir="vertical">↕ Top→Bottom</button>
+        <button class="nas-dir-btn" data-dir="horizontal">↔ Side→Side</button>
+        <button class="nas-dir-btn" data-dir="diagonal">↘ Diagonal</button>
+      </div>
+    </div>
+
+    <!-- Pattern picker (pattern tool only) -->
+    <div class="nas-row hidden" id="nas-pattern-row">
+      <h2 class="nas-row-label">Pattern:</h2>
+      <div id="nas-patterns" role="group" aria-label="Pattern style">
+        <button class="nas-pat-btn active" data-pat="stripes">▤ Stripes</button>
+        <button class="nas-pat-btn" data-pat="dots">⬤ Dots</button>
+        <button class="nas-pat-btn" data-pat="checker">▦ Checker</button>
+        <button class="nas-pat-btn" data-pat="waves">〜 Waves</button>
+        <button class="nas-pat-btn" data-pat="diamonds">◆ Diamonds</button>
+        <button class="nas-pat-btn" data-pat="flowers">✿ Flowers</button>
+      </div>
+    </div>
+
+    <!-- Sticker picker (sticker tool only) -->
+    <div class="nas-row hidden" id="nas-sticker-row">
+      <h2 class="nas-row-label">Sticker:</h2>
+      <div id="nas-stickers" role="group" aria-label="Sticker choice">
+        <button class="nas-stk-btn active" data-stk="⭐">⭐</button>
+        <button class="nas-stk-btn" data-stk="❤️">❤️</button>
+        <button class="nas-stk-btn" data-stk="💎">💎</button>
+        <button class="nas-stk-btn" data-stk="🌸">🌸</button>
+        <button class="nas-stk-btn" data-stk="🦋">🦋</button>
+        <button class="nas-stk-btn" data-stk="✨">✨</button>
+        <button class="nas-stk-btn" data-stk="🌙">🌙</button>
+        <button class="nas-stk-btn" data-stk="🌈">🌈</button>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="nas-actions">
+      <button id="nas-clear-all-btn" class="nas-btn nas-btn-secondary">🗑 Clear All</button>
+      <button id="nas-done-btn" class="nas-btn nas-btn-primary">✨ Done!</button>
+    </div>
+
+    <!-- Celebration overlay -->
+    <div id="nas-celebration" class="hidden">
+      <div class="nas-celeb-inner">
+        <div class="nas-celeb-emoji">💅✨💅</div>
+        <h2>Stunning nails!</h2>
+        <p>Your nail art is absolutely fabulous!</p>
+        <button id="nas-reset-btn" class="nas-btn nas-btn-primary">🔄 Start Over</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script src="script.js"></script>
