@@ -1824,7 +1824,9 @@ class MakeoverGame {
 
         this._initNailClips();
         this._buildPalette();
+        this._bindSectionTabs();
         this._bindNailArt();
+        this._syncToeNailArt();
         this._bindNails();
         this._bindToes();
         this._bindFaceParts();
@@ -1859,6 +1861,47 @@ class MakeoverGame {
                     s.classList.toggle('active', s === btn));
             });
             container.appendChild(btn);
+        });
+    }
+
+    /* ── Section tab switcher (Face / Nails / Toes) ──── */
+    _bindSectionTabs() {
+        document.querySelectorAll('.mkv-sec-tab').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const section = btn.dataset.section;
+                document.querySelectorAll('.mkv-sec-tab').forEach(b => {
+                    b.classList.toggle('active', b === btn);
+                    b.setAttribute('aria-selected', String(b === btn));
+                });
+                document.querySelectorAll('.mkv-canvas-area').forEach(area => {
+                    area.classList.toggle('hidden', area.id !== `mkv-canvas-${section}`);
+                });
+            });
+        });
+    }
+
+    /* ── Mirror nail-art buttons into the toes section ── */
+    _syncToeNailArt() {
+        const src = document.getElementById('mkv-nail-art');
+        const dst = document.getElementById('mkv-toe-nail-art-ref');
+        if (!src || !dst) return;
+        dst.innerHTML = src.innerHTML;
+        // Clicks on cloned buttons update nailArt state + re-sync both groups
+        dst.querySelectorAll('.mkv-art-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.nailArt = btn.dataset.art;
+                // Sync active state across both groups
+                [src, dst].forEach(group => {
+                    group.querySelectorAll('.mkv-art-btn').forEach(b =>
+                        b.classList.toggle('active', b.dataset.art === this.nailArt));
+                });
+                // Re-render painted toes
+                const tSvg = document.getElementById('mkv-toes-svg');
+                document.querySelectorAll('.mkv-toe').forEach((toe, i) => {
+                    if (this.toeColors[i]) this._renderNailArt(tSvg, toe, i, this.toeColors[i], 'toe');
+                    else tSvg.getElementById(`mkv-toe-ov-${i}`)?.remove();
+                });
+            });
         });
     }
 
@@ -2380,6 +2423,16 @@ class MakeoverGame {
             btn.classList.toggle('active', btn.dataset.style === 'none' || btn.dataset.style === 'off'));
         document.querySelectorAll('.mkv-art-btn').forEach(btn =>
             btn.classList.toggle('active', btn.dataset.art === 'plain'));
+
+        // Return to Face tab
+        document.querySelectorAll('.mkv-sec-tab').forEach(b => {
+            const isFace = b.dataset.section === 'face';
+            b.classList.toggle('active', isFace);
+            b.setAttribute('aria-selected', String(isFace));
+        });
+        document.querySelectorAll('.mkv-canvas-area').forEach(area => {
+            area.classList.toggle('hidden', area.id !== 'mkv-canvas-face');
+        });
 
         // Hide celebration
         document.getElementById('mkv-celebration').classList.add('hidden');
