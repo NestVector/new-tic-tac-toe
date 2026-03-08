@@ -1,6 +1,24 @@
 'use strict';
 
 /* ═══════════════════════════════════════════════════════════════
+   SAFE LOCALSTORAGE — prevents fatal errors in restricted contexts
+═══════════════════════════════════════════════════════════════ */
+const safeStorage = (() => {
+    try {
+        localStorage.setItem('__test__', '1');
+        localStorage.removeItem('__test__');
+        return localStorage;
+    } catch (_) {
+        const _mem = {};
+        return {
+            getItem:    k     => Object.prototype.hasOwnProperty.call(_mem, k) ? _mem[k] : null,
+            setItem:    (k,v) => { _mem[k] = String(v); },
+            removeItem: k     => { delete _mem[k]; },
+        };
+    }
+})();
+
+/* ═══════════════════════════════════════════════════════════════
    AGE SYSTEM
 ═══════════════════════════════════════════════════════════════ */
 const AGE_GROUP_MAP = {
@@ -34,7 +52,7 @@ function applyAge(ageKey) {
     document.querySelectorAll('.age-pill').forEach(p => {
         p.classList.toggle('active-age', p.dataset.age === ageKey);
     });
-    localStorage.setItem('selectedAge', ageKey);
+    safeStorage.setItem('selectedAge', ageKey);
 
     // Auto-set AI difficulty for both games based on age (only if not manually overridden this session)
     const defaultDiff = AGE_AI_DIFFICULTY[group] || 'medium';
@@ -42,15 +60,15 @@ function applyAge(ageKey) {
     const tttSel = document.getElementById('difficulty-select');
     if (tttSel) {
         tttSel.value = defaultDiff;
-        // Update in-memory value and localStorage
+        // Update in-memory value and storage
         if (typeof aiDifficulty !== 'undefined') aiDifficulty = defaultDiff;
-        localStorage.setItem('aiDifficulty', defaultDiff);
+        safeStorage.setItem('aiDifficulty', defaultDiff);
     }
     // SNL difficulty
     const snlSel = document.getElementById('snl-difficulty-select');
     if (snlSel) {
         snlSel.value = defaultDiff;
-        localStorage.setItem('snlAiDifficulty', defaultDiff);
+        safeStorage.setItem('snlAiDifficulty', defaultDiff);
         if (typeof snlGame !== 'undefined' && snlGame) snlGame.aiDifficulty = defaultDiff;
     }
 }
@@ -61,7 +79,7 @@ function getStepDelay() {
 
 // Init age system
 (function initAgeSystem() {
-    const savedAge = localStorage.getItem('selectedAge') || '9';
+    const savedAge = safeStorage.getItem('selectedAge') || '9';
     applyAge(savedAge);
     document.querySelectorAll('.age-pill').forEach(pill => {
         pill.addEventListener('click', () => applyAge(pill.dataset.age));
@@ -404,10 +422,11 @@ class CreaturesGame {
         this.myPlayerIdx = null;
         this.mpMode = false;
         // AI difficulty
-        this.aiDifficulty = localStorage.getItem('snlAiDifficulty') || 'medium';
+        this.aiDifficulty = safeStorage.getItem('snlAiDifficulty') || 'medium';
     }
 
     destroy() {
+        this.destroyed = true;
         if (this._aiTimer) { clearTimeout(this._aiTimer); this._aiTimer = null; }
     }
 
@@ -656,6 +675,7 @@ class CreaturesGame {
     }
 
     setRollBtnState() {
+        if (this.destroyed) return;
         const btn = document.getElementById('snl-roll-btn');
         const p = this.currentPlayer;
         const mpBlock = this.mpMode && this.myPlayerIdx !== this.currentIdx;
@@ -912,7 +932,7 @@ document.getElementById('snl-start-btn').addEventListener('click', () => {
 
     if (snlGame) snlGame.destroy();
     snlGame = new CreaturesGame(configs, snlAnimal);
-    snlGame.aiDifficulty = localStorage.getItem('snlAiDifficulty') || 'medium';
+    snlGame.aiDifficulty = safeStorage.getItem('snlAiDifficulty') || 'medium';
 
     document.getElementById('snl-setup').classList.add('hidden');
     document.getElementById('snl-game-screen').classList.remove('hidden');
@@ -1000,7 +1020,7 @@ function startSnlMultiplayerGame(myIdx) {
     snlGame.mpMode = true;
     snlGame.myPlayerIdx = myIdx;
     snlGame.mpConn = snlConn;
-    snlGame.aiDifficulty = localStorage.getItem('snlAiDifficulty') || 'medium';
+    snlGame.aiDifficulty = safeStorage.getItem('snlAiDifficulty') || 'medium';
 
     document.getElementById('snl-setup').classList.add('hidden');
     document.getElementById('snl-game-screen').classList.remove('hidden');
@@ -1168,10 +1188,10 @@ if (snlMpJoinBtn) {
 ═══════════════════════════════════════════════════════════════ */
 const snlDifficultySelect = document.getElementById('snl-difficulty-select');
 if (snlDifficultySelect) {
-    snlDifficultySelect.value = localStorage.getItem('snlAiDifficulty') || 'medium';
+    snlDifficultySelect.value = safeStorage.getItem('snlAiDifficulty') || 'medium';
     snlDifficultySelect.addEventListener('change', () => {
         const val = snlDifficultySelect.value;
-        localStorage.setItem('snlAiDifficulty', val);
+        safeStorage.setItem('snlAiDifficulty', val);
         if (snlGame) snlGame.aiDifficulty = val;
     });
 }
@@ -1200,7 +1220,7 @@ let moveHistory = [];
 let aiTimeoutId = null;
 let autoAdvanceIntervalId = null;
 let autoAdvanceTimeoutId = null;
-let aiDifficulty = localStorage.getItem('aiDifficulty') || 'easy';
+let aiDifficulty = safeStorage.getItem('aiDifficulty') || 'easy';
 
 let multiplayerMode = false;
 let peer = null;
@@ -1209,14 +1229,14 @@ let myRole = null;
 
 function loadPlayerNames() {
     let saved = null;
-    try { saved = JSON.parse(localStorage.getItem('playerNames') || 'null'); } catch { saved = null; }
+    try { saved = JSON.parse(safeStorage.getItem('playerNames') || 'null'); } catch { saved = null; }
     return { X: sanitizePlayerName(saved?.X, 'X'), O: sanitizePlayerName(saved?.O, 'O') };
 }
 
 let playerNames = loadPlayerNames();
 
 let savedScores = null;
-try { savedScores = JSON.parse(localStorage.getItem('scores') || 'null'); } catch { savedScores = null; }
+try { savedScores = JSON.parse(safeStorage.getItem('scores') || 'null'); } catch { savedScores = null; }
 const scores = {
     X:    Number.isInteger(savedScores?.X)    ? savedScores.X    : 0,
     O:    Number.isInteger(savedScores?.O)    ? savedScores.O    : 0,
@@ -1240,7 +1260,7 @@ function getPlayerName(player) {
     return playerNames[player];
 }
 
-function persistPlayerNames() { localStorage.setItem('playerNames', JSON.stringify(playerNames)); }
+function persistPlayerNames() { safeStorage.setItem('playerNames', JSON.stringify(playerNames)); }
 
 function updateNameDisplay() {
     scoreLabelX.textContent = getPlayerName('X');
@@ -1449,7 +1469,7 @@ function updateScoreDisplay() {
     document.getElementById('score-x').textContent    = scores.X;
     document.getElementById('score-o').textContent    = scores.O;
     document.getElementById('score-draw').textContent = scores.draw;
-    localStorage.setItem('scores', JSON.stringify(scores));
+    safeStorage.setItem('scores', JSON.stringify(scores));
 }
 
 function resetBoardVisuals() {
@@ -1562,10 +1582,10 @@ playerONameInput.addEventListener('change', () => { savePlayerName('O', playerON
 
 darkModeToggle.addEventListener('change', () => {
     document.body.classList.toggle('dark-mode', darkModeToggle.checked);
-    localStorage.setItem('darkMode', darkModeToggle.checked);
+    safeStorage.setItem('darkMode', darkModeToggle.checked);
 });
 
-if (localStorage.getItem('darkMode') === 'true') {
+if (safeStorage.getItem('darkMode') === 'true') {
     darkModeToggle.checked = true;
     document.body.classList.add('dark-mode');
 }
@@ -1573,7 +1593,7 @@ if (localStorage.getItem('darkMode') === 'true') {
 difficultySelect.value = aiDifficulty;
 difficultySelect.addEventListener('change', () => {
     aiDifficulty = difficultySelect.value;
-    localStorage.setItem('aiDifficulty', aiDifficulty);
+    safeStorage.setItem('aiDifficulty', aiDifficulty);
 });
 
 // Multiplayer (PeerJS WebRTC)
