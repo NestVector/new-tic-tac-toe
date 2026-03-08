@@ -676,6 +676,7 @@ class CreaturesGame {
     }
 
     async _doRoll(predeterminedResult) {
+        if (this.busy) return;
         this.busy = true;
         this.setRollBtnState();
         sound.playDice();
@@ -690,7 +691,7 @@ class CreaturesGame {
             await rollDice3D(result);
             await this._movePlayer(result);
         } catch (err) {
-            // Reset busy so buttons always become re-enabled on any unexpected error
+            // On any unexpected error, recover by resetting and advancing turn
             this.busy = false;
             this.setRollBtnState();
         }
@@ -703,16 +704,9 @@ class CreaturesGame {
         if (newPos > 100) {
             this.setMessage(`Need ${100 - player.position} or less! Stay at ${player.position || 'Start'}.`);
             await this._sleep(900);
-            this.busy = false;
             this._nextTurn();
             return;
         }
-
-        // Guard: ensure busy is always reset on any error mid-movement
-        let _cleanupDone = false;
-        const _ensureCleanup = () => {
-            if (!_cleanupDone) { _cleanupDone = true; this.busy = false; this._clearGhostToken(); }
-        };
 
         // Show ghost/shadow token at destination before movement begins
         this._showGhostToken(this.currentIdx, newPos);
@@ -731,7 +725,6 @@ class CreaturesGame {
 
         // Check win first
         if (player.position === 100) {
-            _ensureCleanup();
             await this._handleWin();
             return;
         }
@@ -777,12 +770,10 @@ class CreaturesGame {
 
         // Check win after hazard/ladder
         if (player.position === 100) {
-            _ensureCleanup();
             await this._handleWin();
             return;
         }
 
-        _ensureCleanup();
         this._nextTurn();
     }
 
