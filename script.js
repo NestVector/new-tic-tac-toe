@@ -1800,3 +1800,946 @@ document.addEventListener('keydown', (e) => {
         closeHtp('ttt-htp-overlay');
     }
 });
+
+/* ═══════════════════════════════════════════════════════════════
+   PRINCESS MAKEOVER GAME
+═══════════════════════════════════════════════════════════════ */
+class MakeoverGame {
+    constructor() {
+        // State
+        this.selectedColor = '#ff6eb4';
+        this.nailColors    = new Array(10).fill(null);
+        this.toeColors     = new Array(10).fill(null);
+        this.faceColors    = {};
+        this.skinTone      = '#fcd9b6';
+        this.hairColor     = '#8B4513';
+        this.nailArt       = 'plain';
+        this.earringStyle  = 'none';
+        this.sunglassStyle = 'off';
+        this.hatStyle      = 'none';
+        this.frecklesStyle = 'off';
+        this.necklaceStyle = 'none';
+
+        this._skinTones = ['#fcd9b6','#f4b88a','#c68642','#8d5524','#4a2912'];
+
+        this._initNailClips();
+        this._buildPalette();
+        this._bindNailArt();
+        this._bindNails();
+        this._bindToes();
+        this._bindFaceParts();
+        this._bindSkinTones();
+        this._bindAccessories();
+        this._bindButtons();
+    }
+
+    /* ── Colour palette ──────────────────────────────── */
+    get _palette() {
+        return [
+            '#ff6eb4','#ff9ed2','#c77dff','#a0c4ff',
+            '#ffd166','#ff6b6b','#06d6a0','#f4a261',
+            '#e63946','#ffffff','#ffb3c6','#b5ead7',
+            '#f9c74f','#90e0ef','#a8dadc','#e63b7a',
+            '#1e293b','#8B4513','#7c3aed','#10b981'
+        ];
+    }
+
+    _buildPalette() {
+        const container = document.getElementById('mkv-palette');
+        container.innerHTML = '';
+        this._palette.forEach((color, i) => {
+            const btn = document.createElement('button');
+            btn.className = 'mkv-swatch';
+            btn.style.backgroundColor = color;
+            btn.setAttribute('aria-label', `Color ${i + 1}`);
+            if (i === 0) btn.classList.add('active');
+            btn.addEventListener('click', () => {
+                this.selectedColor = color;
+                container.querySelectorAll('.mkv-swatch').forEach(s =>
+                    s.classList.toggle('active', s === btn));
+            });
+            container.appendChild(btn);
+        });
+    }
+
+    /* ── Nail clip paths (for nail art overlays) ─────── */
+    _initNailClips() {
+        const svgNS = 'http://www.w3.org/2000/svg';
+        [['mkv-nails-svg', '.mkv-nail', 'nail', 'data-nail'],
+         ['mkv-toes-svg',  '.mkv-toe',  'toe',  'data-toe' ]].forEach(([svgId, sel, prefix, attr]) => {
+            const svg = document.getElementById(svgId);
+            let defs = svg.querySelector('defs');
+            if (!defs) {
+                defs = document.createElementNS(svgNS, 'defs');
+                svg.insertBefore(defs, svg.firstChild);
+            }
+            svg.querySelectorAll(sel).forEach(el => {
+                const idx = el.getAttribute(attr.replace('data-', ''));
+                const cp  = document.createElementNS(svgNS, 'clipPath');
+                cp.id     = `mkv-${prefix}-clip-${idx}`;
+                const shape = el.cloneNode();
+                shape.removeAttribute('class');
+                shape.removeAttribute(attr);
+                cp.appendChild(shape);
+                defs.appendChild(cp);
+            });
+        });
+    }
+
+    /* ── Nail art picker ─────────────────────────────── */
+    _bindNailArt() {
+        document.querySelectorAll('.mkv-art-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.nailArt = btn.dataset.art;
+                document.querySelectorAll('.mkv-art-btn').forEach(b =>
+                    b.classList.toggle('active', b === btn));
+                // Re-render art on already-painted nails/toes
+                const nSvg = document.getElementById('mkv-nails-svg');
+                const tSvg = document.getElementById('mkv-toes-svg');
+                document.querySelectorAll('.mkv-nail').forEach((nail, i) => {
+                    if (this.nailColors[i]) this._renderNailArt(nSvg, nail, i, this.nailColors[i], 'nail');
+                    else nSvg.getElementById(`mkv-nail-ov-${i}`)?.remove();
+                });
+                document.querySelectorAll('.mkv-toe').forEach((toe, i) => {
+                    if (this.toeColors[i]) this._renderNailArt(tSvg, toe, i, this.toeColors[i], 'toe');
+                    else tSvg.getElementById(`mkv-toe-ov-${i}`)?.remove();
+                });
+            });
+        });
+    }
+
+    /* ── Skin tones ──────────────────────────────────── */
+    _bindSkinTones() {
+        document.querySelectorAll('.mkv-skin-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const idx = parseInt(btn.dataset.skin, 10);
+                this.skinTone = this._skinTones[idx];
+                document.querySelectorAll('.mkv-skin-btn').forEach(b => {
+                    b.classList.toggle('active', b === btn);
+                    b.setAttribute('aria-pressed', String(b === btn));
+                });
+                this._applySkinTone();
+            });
+        });
+    }
+
+    _applySkinTone() {
+        const t = this.skinTone;
+        const el = (id) => document.getElementById(id);
+        if (el('mkv-face-base'))  el('mkv-face-base').setAttribute('fill', t);
+        if (el('mkv-face-cover')) el('mkv-face-cover').setAttribute('fill', t);
+        if (el('mkv-neck'))       el('mkv-neck').setAttribute('fill', t);
+        document.querySelectorAll('.mkv-nail').forEach((nail, i) => {
+            if (!this.nailColors[i]) nail.setAttribute('fill', '#f3f4f6');
+        });
+        document.querySelectorAll('.mkv-toe').forEach((toe, i) => {
+            if (!this.toeColors[i]) toe.setAttribute('fill', '#f3f4f6');
+        });
+    }
+
+    /* ── Nails ───────────────────────────────────────── */
+    _bindNails() {
+        const svg = document.getElementById('mkv-nails-svg');
+        document.querySelectorAll('.mkv-nail').forEach(nail => {
+            nail.addEventListener('click', () => {
+                const idx = parseInt(nail.dataset.nail, 10);
+                this.nailColors[idx] = this.selectedColor;
+                nail.setAttribute('fill', this.selectedColor);
+                nail.setAttribute('stroke', this._darken(this.selectedColor));
+                this._renderNailArt(svg, nail, idx, this.selectedColor, 'nail');
+                this._sparkle(nail);
+                this._playPaint();
+            });
+        });
+    }
+
+    /* ── Toes ────────────────────────────────────────── */
+    _bindToes() {
+        const svg = document.getElementById('mkv-toes-svg');
+        document.querySelectorAll('.mkv-toe').forEach(toe => {
+            toe.addEventListener('click', () => {
+                const idx = parseInt(toe.dataset.toe, 10);
+                this.toeColors[idx] = this.selectedColor;
+                toe.setAttribute('fill', this.selectedColor);
+                toe.setAttribute('stroke', this._darken(this.selectedColor));
+                this._renderNailArt(svg, toe, idx, this.selectedColor, 'toe');
+                this._sparkle(toe);
+                this._playPaint();
+            });
+        });
+    }
+
+    /* ── Nail art overlay renderer ───────────────────── */
+    _renderNailArt(svgEl, el, idx, color, prefix) {
+        const svgNS = 'http://www.w3.org/2000/svg';
+        const ovId  = `mkv-${prefix}-ov-${idx}`;
+        svgEl.getElementById(ovId)?.remove();
+        if (this.nailArt === 'plain') return;
+
+        const x = parseFloat(el.getAttribute('x'));
+        const y = parseFloat(el.getAttribute('y'));
+        const w = parseFloat(el.getAttribute('width'));
+        const h = parseFloat(el.getAttribute('height'));
+
+        const g = document.createElementNS(svgNS, 'g');
+        g.id = ovId;
+        g.setAttribute('clip-path', `url(#mkv-${prefix}-clip-${idx})`);
+        g.setAttribute('pointer-events', 'none');
+
+        const mk = (tag, attrs) => {
+            const node = document.createElementNS(svgNS, tag);
+            Object.entries(attrs).forEach(([k, v]) => node.setAttribute(k, v));
+            return node;
+        };
+
+        if (this.nailArt === 'french') {
+            g.appendChild(mk('rect', {x, y, width: w, height: h * 0.28, fill: 'white', opacity: '0.88'}));
+        } else if (this.nailArt === 'glitter') {
+            for (let i = 0; i < 9; i++) {
+                g.appendChild(mk('circle', {
+                    cx: x + 2 + Math.random() * (w - 4),
+                    cy: y + 2 + Math.random() * (h - 4),
+                    r:  1 + Math.random() * 1.5,
+                    fill: 'white', opacity: String(0.45 + Math.random() * 0.5)
+                }));
+            }
+        } else if (this.nailArt === 'stripes') {
+            for (let i = 0; i < 4; i++) {
+                g.appendChild(mk('rect', {x, y: y + i * (h / 4), width: w, height: h / 8, fill: 'white', opacity: '0.38'}));
+            }
+        } else if (this.nailArt === 'dots') {
+            [[0.25,0.25],[0.75,0.25],[0.5,0.5],[0.25,0.75],[0.75,0.75]].forEach(([px, py]) => {
+                g.appendChild(mk('circle', {cx: x + w * px, cy: y + h * py, r: Math.min(w, h) * 0.09, fill: 'white', opacity: '0.75'}));
+            });
+        } else if (this.nailArt === 'hearts') {
+            const cx = x + w / 2, cy = y + h * 0.48, s = Math.min(w, h) * 0.22;
+            g.appendChild(mk('path', {
+                d: `M${cx},${cy+s*0.4} C${cx-s*1.1},${cy-s*0.3} ${cx-s*1.9},${cy+s*0.5} ${cx},${cy+s*1.8} C${cx+s*1.9},${cy+s*0.5} ${cx+s*1.1},${cy-s*0.3} ${cx},${cy+s*0.4}Z`,
+                fill: 'white', opacity: '0.82'
+            }));
+        } else if (this.nailArt === 'stars') {
+            const cx = x + w / 2, cy = y + h * 0.5, r1 = Math.min(w, h) * 0.26, r2 = r1 * 0.44;
+            const pts = Array.from({length: 10}, (_, i) => {
+                const r = i % 2 === 0 ? r1 : r2;
+                const a = (i * Math.PI / 5) - Math.PI / 2;
+                return `${cx + r * Math.cos(a)},${cy + r * Math.sin(a)}`;
+            }).join(' ');
+            g.appendChild(mk('polygon', {points: pts, fill: 'white', opacity: '0.84'}));
+        }
+
+        svgEl.appendChild(g);
+    }
+
+    /* ── Face parts (makeup) ─────────────────────────── */
+    _bindFaceParts() {
+        document.querySelectorAll('.mkv-face-part').forEach(part => {
+            part.addEventListener('click', () => {
+                const p = part.dataset.part;
+                if (p === 'blush-l' || p === 'blush-r') {
+                    this.faceColors[p] = this.selectedColor;
+                    part.setAttribute('fill', this.selectedColor);
+                    part.setAttribute('opacity', '0.55');
+                } else if (p === 'shadow-l' || p === 'shadow-r') {
+                    this.faceColors[p] = this.selectedColor;
+                    part.setAttribute('fill', this.selectedColor);
+                    part.setAttribute('opacity', '0.65');
+                } else if (p === 'lips') {
+                    this.faceColors[p] = this.selectedColor;
+                    part.setAttribute('fill', this.selectedColor);
+                } else if (p === 'hair') {
+                    this.hairColor = this.selectedColor;
+                    part.setAttribute('fill', this.selectedColor);
+                } else if (p === 'earring-l' || p === 'earring-r') {
+                    if (this.earringStyle !== 'none') {
+                        this.faceColors[p] = this.selectedColor;
+                        this._renderEarrings();
+                    }
+                }
+                this._sparkle(part);
+                this._playPaint();
+            });
+        });
+    }
+
+    /* ── Accessories ─────────────────────────────────── */
+    _bindAccessories() {
+        document.querySelectorAll('.mkv-acc-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const acc   = btn.dataset.acc;
+                const style = btn.dataset.style;
+                document.querySelectorAll(`.mkv-acc-btn[data-acc="${acc}"]`).forEach(b =>
+                    b.classList.toggle('active', b === btn));
+
+                if (acc === 'earring') {
+                    this.earringStyle = style;
+                    this._renderEarrings();
+                } else if (acc === 'sunglasses') {
+                    this.sunglassStyle = style;
+                    this._renderSunglasses();
+                } else if (acc === 'hat') {
+                    this.hatStyle = style;
+                    this._renderHat();
+                } else if (acc === 'freckles') {
+                    this.frecklesStyle = style;
+                    this._renderFreckles();
+                } else if (acc === 'necklace') {
+                    this.necklaceStyle = style;
+                    this._renderNecklace();
+                }
+                this._playPaint();
+            });
+        });
+    }
+
+    _renderEarrings() {
+        const svgNS = 'http://www.w3.org/2000/svg';
+        const svg   = document.getElementById('mkv-face-svg');
+        const color = this.faceColors['earring-l'] || this.selectedColor;
+
+        // Remove old earring renders
+        svg.querySelectorAll('.mkv-earring-render').forEach(el => el.remove());
+
+        if (this.earringStyle === 'none') return;
+
+        const positions = [{x: 18, y: 130}, {x: 182, y: 130}];
+        positions.forEach(pos => {
+            let el;
+            if (this.earringStyle === 'circle') {
+                el = document.createElementNS(svgNS, 'circle');
+                el.setAttribute('cx', pos.x);
+                el.setAttribute('cy', pos.y);
+                el.setAttribute('r', '9');
+                el.setAttribute('fill', color);
+            } else if (this.earringStyle === 'star') {
+                el = document.createElementNS(svgNS, 'text');
+                el.setAttribute('x', pos.x);
+                el.setAttribute('y', pos.y + 5);
+                el.setAttribute('text-anchor', 'middle');
+                el.setAttribute('font-size', '14');
+                el.textContent = '⭐';
+            } else if (this.earringStyle === 'heart') {
+                el = document.createElementNS(svgNS, 'text');
+                el.setAttribute('x', pos.x);
+                el.setAttribute('y', pos.y + 5);
+                el.setAttribute('text-anchor', 'middle');
+                el.setAttribute('font-size', '14');
+                el.textContent = '❤️';
+            } else if (this.earringStyle === 'diamond') {
+                // Diamond drop: circle stud + line + diamond
+                const g = document.createElementNS(svgNS, 'g');
+                g.setAttribute('class', 'mkv-earring-render');
+                const stud = document.createElementNS(svgNS, 'circle');
+                stud.setAttribute('cx', pos.x); stud.setAttribute('cy', pos.y - 6);
+                stud.setAttribute('r', '5'); stud.setAttribute('fill', color);
+                const line = document.createElementNS(svgNS, 'line');
+                line.setAttribute('x1', pos.x); line.setAttribute('y1', pos.y - 1);
+                line.setAttribute('x2', pos.x); line.setAttribute('y2', pos.y + 6);
+                line.setAttribute('stroke', color); line.setAttribute('stroke-width', '2');
+                const gem = document.createElementNS(svgNS, 'polygon');
+                const cx = pos.x, cy = pos.y + 11;
+                gem.setAttribute('points', `${cx},${cy-6} ${cx+6},${cy} ${cx},${cy+6} ${cx-6},${cy}`);
+                gem.setAttribute('fill', color);
+                g.appendChild(stud); g.appendChild(line); g.appendChild(gem);
+                svg.appendChild(g);
+                return;
+            }
+            if (el) {
+                el.setAttribute('class', 'mkv-earring-render');
+                el.setAttribute('pointer-events', 'none');
+                svg.appendChild(el);
+            }
+        });
+    }
+
+    _renderSunglasses() {
+        const sg = document.getElementById('mkv-sunglasses');
+        if (this.sunglassStyle === 'off') {
+            sg.setAttribute('display', 'none');
+            return;
+        }
+        sg.setAttribute('display', 'block');
+        const lensColor = this.sunglassStyle === 'pink' ? '#f9a8d4'
+                        : this.sunglassStyle === 'blue' ? '#93c5fd'
+                        : '#1e293b';
+        const opacity   = this.sunglassStyle === 'dark' ? '0.85' : '0.7';
+        sg.querySelectorAll('rect').forEach(r => {
+            r.setAttribute('fill', lensColor);
+            r.setAttribute('opacity', opacity);
+        });
+    }
+
+    _renderHat() {
+        const hatG = document.getElementById('mkv-hat');
+        if (this.hatStyle === 'none') {
+            hatG.setAttribute('display', 'none');
+            return;
+        }
+        hatG.setAttribute('display', 'block');
+
+        // Remove previously injected custom hat elements
+        const svg = document.getElementById('mkv-face-svg');
+        svg.querySelectorAll('.mkv-hat-custom').forEach(el => el.remove());
+
+        const svgNS = 'http://www.w3.org/2000/svg';
+
+        if (this.hatStyle === 'princess') {
+            // Crown / tiara
+            hatG.setAttribute('display', 'none');
+            const g = document.createElementNS(svgNS, 'g');
+            g.setAttribute('class', 'mkv-hat-custom');
+            const crown = document.createElementNS(svgNS, 'text');
+            crown.setAttribute('x', '100'); crown.setAttribute('y', '30');
+            crown.setAttribute('text-anchor', 'middle'); crown.setAttribute('font-size', '46');
+            crown.textContent = '👑';
+            g.appendChild(crown);
+            svg.insertBefore(g, svg.firstChild);
+        } else if (this.hatStyle === 'cap') {
+            hatG.setAttribute('display', 'none');
+            const g = document.createElementNS(svgNS, 'g');
+            g.setAttribute('class', 'mkv-hat-custom');
+            // Cap body
+            const body = document.createElementNS(svgNS, 'ellipse');
+            body.setAttribute('cx','100'); body.setAttribute('cy','40');
+            body.setAttribute('rx','70'); body.setAttribute('ry','38');
+            body.setAttribute('fill','#ef4444');
+            // Brim
+            const brim = document.createElementNS(svgNS, 'ellipse');
+            brim.setAttribute('cx','125'); brim.setAttribute('cy','68');
+            brim.setAttribute('rx','50'); brim.setAttribute('ry','10');
+            brim.setAttribute('fill','#dc2626');
+            g.appendChild(body); g.appendChild(brim);
+            svg.insertBefore(g, svg.firstChild);
+        } else if (this.hatStyle === 'witch') {
+            hatG.setAttribute('display', 'none');
+            const g = document.createElementNS(svgNS, 'g');
+            g.setAttribute('class', 'mkv-hat-custom');
+            // Wide brim
+            const brim = document.createElementNS(svgNS, 'ellipse');
+            brim.setAttribute('cx','100'); brim.setAttribute('cy','42');
+            brim.setAttribute('rx','85'); brim.setAttribute('ry','14');
+            brim.setAttribute('fill','#1e1e2e');
+            // Cone
+            const cone = document.createElementNS(svgNS, 'polygon');
+            cone.setAttribute('points','100,-25 60,40 140,40');
+            cone.setAttribute('fill','#1e1e2e');
+            // Band
+            const band = document.createElementNS(svgNS, 'rect');
+            band.setAttribute('x','60'); band.setAttribute('y','28');
+            band.setAttribute('width','80'); band.setAttribute('height','12');
+            band.setAttribute('fill','#7c3aed');
+            g.appendChild(cone); g.appendChild(brim); g.appendChild(band);
+            svg.insertBefore(g, svg.firstChild);
+        } else if (this.hatStyle === 'bow') {
+            hatG.setAttribute('display', 'none');
+            const g = document.createElementNS(svgNS, 'g');
+            g.setAttribute('class', 'mkv-hat-custom');
+            const bow = document.createElementNS(svgNS, 'text');
+            bow.setAttribute('x','100'); bow.setAttribute('y','18');
+            bow.setAttribute('text-anchor','middle'); bow.setAttribute('font-size','38');
+            bow.textContent = '🎀';
+            g.appendChild(bow);
+            svg.insertBefore(g, svg.firstChild);
+        }
+    }
+
+    /* ── Freckles ────────────────────────────────────── */
+    _renderFreckles() {
+        const svgNS = 'http://www.w3.org/2000/svg';
+        const g = document.getElementById('mkv-freckles-group');
+        g.innerHTML = '';
+        if (this.frecklesStyle === 'off') return;
+
+        const allPos = [
+            [36,118],[44,113],[40,126],[50,122],[34,131],
+            [46,136],[54,116],[37,138],[50,130],[42,142],
+            [164,118],[156,113],[160,126],[150,122],[166,131],
+            [154,136],[146,116],[163,138],[150,130],[158,142]
+        ];
+        const count = this.frecklesStyle === 'more' ? 20 : 10;
+        allPos.slice(0, count).forEach(([cx, cy]) => {
+            const c = document.createElementNS(svgNS, 'circle');
+            c.setAttribute('cx', cx); c.setAttribute('cy', cy);
+            c.setAttribute('r', '2.2');
+            c.setAttribute('fill', '#b97c5d');
+            c.setAttribute('opacity', '0.52');
+            g.appendChild(c);
+        });
+    }
+
+    /* ── Necklace ────────────────────────────────────── */
+    _renderNecklace() {
+        const svgNS = 'http://www.w3.org/2000/svg';
+        const g = document.getElementById('mkv-necklace-group');
+        g.innerHTML = '';
+        if (this.necklaceStyle === 'none') return;
+
+        const color = this.selectedColor;
+        const mk = (tag, attrs) => {
+            const node = document.createElementNS(svgNS, tag);
+            Object.entries(attrs).forEach(([k, v]) => node.setAttribute(k, v));
+            return node;
+        };
+
+        if (this.necklaceStyle === 'simple') {
+            g.appendChild(mk('path', {d: 'M62,196 Q100,216 138,196', fill: 'none', stroke: color, 'stroke-width': '3', 'stroke-linecap': 'round'}));
+        } else if (this.necklaceStyle === 'pearl') {
+            g.appendChild(mk('path', {d: 'M62,196 Q100,216 138,196', fill: 'none', stroke: '#e2e8f0', 'stroke-width': '1'}));
+            for (let i = 0; i <= 8; i++) {
+                const t = i / 8;
+                const px = 62 + 76 * t;
+                const py = 196 + 20 * 4 * t * (1 - t);
+                g.appendChild(mk('circle', {cx: px, cy: py, r: '4.5', fill: '#f1f5f9', stroke: '#94a3b8', 'stroke-width': '0.8'}));
+            }
+        } else if (this.necklaceStyle === 'gem') {
+            g.appendChild(mk('path', {d: 'M66,195 Q100,212 134,195', fill: 'none', stroke: color, 'stroke-width': '2', 'stroke-linecap': 'round'}));
+            g.appendChild(mk('polygon', {points: '100,209 108,215 100,221 92,215', fill: color, stroke: 'white', 'stroke-width': '1'}));
+            g.appendChild(mk('line', {x1: '97', y1: '213', x2: '100', y2: '210', stroke: 'white', 'stroke-width': '1.2', 'stroke-linecap': 'round'}));
+        }
+    }
+
+    /* ── Sparkle + sound helpers ─────────────────────── */
+    _sparkle(el) {
+        el.classList.add('mkv-sparkle-pop');
+        setTimeout(() => el.classList.remove('mkv-sparkle-pop'), 450);
+    }
+
+    _playPaint() {
+        try {
+            // Use the existing SoundEngine for a soft chime
+            sound._note(880, 'sine', 0.12, 0.18);
+        } catch(e) { /* silent fail if audio unavailable */ }
+    }
+
+    _darken(hex) {
+        // Slightly darken a hex color for stroke
+        const n = parseInt(hex.replace('#',''), 16);
+        const r = Math.max(0, (n >> 16) - 30);
+        const g = Math.max(0, ((n >> 8) & 0xff) - 30);
+        const b = Math.max(0, (n & 0xff) - 30);
+        return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+    }
+
+    /* ── Buttons ─────────────────────────────────────── */
+    _bindButtons() {
+        document.getElementById('mkv-done-btn').addEventListener('click', () => {
+            document.getElementById('mkv-celebration').classList.remove('hidden');
+            launchBigConfetti();
+            try { sound.playWin(); } catch(e) {}
+        });
+
+        document.getElementById('mkv-reset-btn').addEventListener('click', () => {
+            this._reset();
+        });
+    }
+
+    _reset() {
+        this.nailColors    = new Array(10).fill(null);
+        this.toeColors     = new Array(10).fill(null);
+        this.faceColors    = {};
+        this.nailArt       = 'plain';
+        this.earringStyle  = 'none';
+        this.sunglassStyle = 'off';
+        this.hatStyle      = 'none';
+        this.frecklesStyle = 'off';
+        this.necklaceStyle = 'none';
+        this.hairColor     = '#8B4513';
+
+        // Reset nail + toe colors and art overlays
+        const nSvg = document.getElementById('mkv-nails-svg');
+        const tSvg = document.getElementById('mkv-toes-svg');
+        document.querySelectorAll('.mkv-nail').forEach((n, i) => {
+            n.setAttribute('fill', '#f3f4f6');
+            n.setAttribute('stroke', '#d1d5db');
+            nSvg.getElementById(`mkv-nail-ov-${i}`)?.remove();
+        });
+        document.querySelectorAll('.mkv-toe').forEach((t, i) => {
+            t.setAttribute('fill', '#f3f4f6');
+            t.setAttribute('stroke', '#d1d5db');
+            tSvg.getElementById(`mkv-toe-ov-${i}`)?.remove();
+        });
+
+        // Reset face parts
+        document.getElementById('mkv-hair').setAttribute('fill', '#8B4513');
+        document.getElementById('mkv-blush-l').setAttribute('fill', '#ffb3c6');
+        document.getElementById('mkv-blush-l').setAttribute('opacity', '0.5');
+        document.getElementById('mkv-blush-r').setAttribute('fill', '#ffb3c6');
+        document.getElementById('mkv-blush-r').setAttribute('opacity', '0.5');
+        document.getElementById('mkv-shadow-l').setAttribute('fill', 'transparent');
+        document.getElementById('mkv-shadow-r').setAttribute('fill', 'transparent');
+        document.getElementById('mkv-lips').setAttribute('fill', '#e57373');
+
+        // Reset accessories
+        document.getElementById('mkv-sunglasses').setAttribute('display', 'none');
+        document.getElementById('mkv-hat').setAttribute('display', 'none');
+        document.getElementById('mkv-freckles-group').innerHTML = '';
+        document.getElementById('mkv-necklace-group').innerHTML = '';
+        document.getElementById('mkv-face-svg').querySelectorAll('.mkv-earring-render, .mkv-hat-custom').forEach(el => el.remove());
+
+        // Reset all picker buttons
+        document.querySelectorAll('.mkv-acc-btn').forEach(btn =>
+            btn.classList.toggle('active', btn.dataset.style === 'none' || btn.dataset.style === 'off'));
+        document.querySelectorAll('.mkv-art-btn').forEach(btn =>
+            btn.classList.toggle('active', btn.dataset.art === 'plain'));
+
+        // Hide celebration
+        document.getElementById('mkv-celebration').classList.add('hidden');
+    }
+}
+
+// Lazy-init on first tab visit
+let makeoverGame = null;
+document.getElementById('tab-mkv').addEventListener('click', () => {
+    if (!makeoverGame) makeoverGame = new MakeoverGame();
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   NAIL ART STUDIO
+═══════════════════════════════════════════════════════════════ */
+class NailArtStudio {
+    constructor() {
+        this.selectedColor   = '#ff6eb4';
+        this.selectedColor2  = '#c77dff';
+        this.gradientDir     = 'vertical';
+        this.selectedPattern = 'stripes';
+        this.selectedSticker = '⭐';
+        this.selectedTool    = 'color';
+        this.nailStates = Array.from({length: 5}, () => ({fill: '#f3f4f6'}));
+
+        this._labels = ['Thumb','Index','Middle','Ring','Pinky'];
+        this._widths = [110, 100, 108, 96, 80]; // CSS px
+
+        this._buildNails();
+        this._buildPalettes();
+        this._bindTools();
+        this._bindPatterns();
+        this._bindStickers();
+        this._bindGradientDir();
+        this._bindButtons();
+        this._updateToolUI();
+    }
+
+    get _palette() {
+        return [
+            '#ff6eb4','#ff9ed2','#c77dff','#a0c4ff',
+            '#ffd166','#ff6b6b','#06d6a0','#f4a261',
+            '#e63946','#ffffff','#ffb3c6','#b5ead7',
+            '#f9c74f','#90e0ef','#a8dadc','#e63b7a',
+            '#1e293b','#8B4513','#7c3aed','#10b981'
+        ];
+    }
+
+    /* ── Build five nail SVGs ─────────────────────────── */
+    _buildNails() {
+        const NS  = 'http://www.w3.org/2000/svg';
+        const row = document.getElementById('nas-nails-row');
+        row.innerHTML = '';
+
+        // Universal nail shape + sheen in viewBox 0 0 100 160
+        const NAIL  = 'M 18,112 Q 18,10 50,10 Q 82,10 82,112 L 77,143 Q 50,152 23,143 Z';
+        const SHEEN = 'M 26,18 Q 38,12 50,15 Q 44,52 33,50 Q 22,47 26,18 Z';
+
+        this._labels.forEach((label, i) => {
+            const wrap = document.createElement('div');
+            wrap.className = 'nas-nail-wrap';
+            wrap.dataset.nail = i;
+            wrap.style.width = this._widths[i] + 'px';
+
+            const svg = document.createElementNS(NS, 'svg');
+            svg.setAttribute('viewBox', '0 0 100 160');
+            svg.setAttribute('class', 'nas-nail-svg');
+            svg.setAttribute('role', 'button');
+            svg.setAttribute('tabindex', '0');
+            svg.setAttribute('aria-label', label + ' nail');
+
+            // defs: clip + gradient
+            const defs = document.createElementNS(NS, 'defs');
+
+            const clip = document.createElementNS(NS, 'clipPath');
+            clip.id = `nas-clip-${i}`;
+            const cp = document.createElementNS(NS, 'path');
+            cp.setAttribute('d', NAIL);
+            clip.appendChild(cp);
+            defs.appendChild(clip);
+
+            const grad = document.createElementNS(NS, 'linearGradient');
+            grad.id = `nas-grad-${i}`;
+            grad.setAttribute('x1','0'); grad.setAttribute('y1','0');
+            grad.setAttribute('x2','0'); grad.setAttribute('y2','1');
+            ['#f3f4f6','#f3f4f6'].forEach((c, si) => {
+                const s = document.createElementNS(NS, 'stop');
+                s.setAttribute('offset', si === 0 ? '0%' : '100%');
+                s.setAttribute('stop-color', c);
+                grad.appendChild(s);
+            });
+            defs.appendChild(grad);
+            svg.appendChild(defs);
+
+            // Base shape
+            const base = document.createElementNS(NS, 'path');
+            base.setAttribute('d', NAIL);
+            base.setAttribute('fill', '#f3f4f6');
+            base.setAttribute('stroke', '#d1d5db');
+            base.setAttribute('stroke-width', '1.5');
+            base.setAttribute('class', 'nas-nail-base');
+            svg.appendChild(base);
+
+            // Art layer (clipped)
+            const layer = document.createElementNS(NS, 'g');
+            layer.setAttribute('class', 'nas-art-layer');
+            layer.setAttribute('clip-path', `url(#nas-clip-${i})`);
+            layer.setAttribute('pointer-events', 'none');
+            svg.appendChild(layer);
+
+            // Sheen highlight
+            const sheen = document.createElementNS(NS, 'path');
+            sheen.setAttribute('d', SHEEN);
+            sheen.setAttribute('fill', 'white');
+            sheen.setAttribute('opacity', '0.22');
+            sheen.setAttribute('pointer-events', 'none');
+            svg.appendChild(sheen);
+
+            wrap.appendChild(svg);
+
+            const lbl = document.createElement('span');
+            lbl.className = 'nas-nail-label';
+            lbl.textContent = label;
+            wrap.appendChild(lbl);
+
+            wrap.addEventListener('click', () => this._applyTool(i));
+            svg.addEventListener('keydown', e => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this._applyTool(i); }
+            });
+
+            row.appendChild(wrap);
+        });
+    }
+
+    /* ── Colour palettes (primary + secondary) ───────── */
+    _buildPalettes() {
+        ['nas-palette1','nas-palette2'].forEach((cid, palIdx) => {
+            const container = document.getElementById(cid);
+            container.innerHTML = '';
+            this._palette.forEach((color, i) => {
+                const btn = document.createElement('button');
+                btn.className = 'nas-swatch';
+                btn.style.backgroundColor = color;
+                btn.setAttribute('aria-label', `Color ${i + 1}`);
+                if (palIdx === 0 && i === 0) btn.classList.add('active');
+                if (palIdx === 1 && i === 2) btn.classList.add('active');
+                btn.addEventListener('click', () => {
+                    if (palIdx === 0) this.selectedColor  = color;
+                    else              this.selectedColor2 = color;
+                    container.querySelectorAll('.nas-swatch').forEach(s =>
+                        s.classList.toggle('active', s === btn));
+                });
+                container.appendChild(btn);
+            });
+        });
+    }
+
+    /* ── Tool picker ──────────────────────────────────── */
+    _bindTools() {
+        document.querySelectorAll('.nas-tool-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.selectedTool = btn.dataset.tool;
+                document.querySelectorAll('.nas-tool-btn').forEach(b =>
+                    b.classList.toggle('active', b === btn));
+                this._updateToolUI();
+            });
+        });
+    }
+
+    _updateToolUI() {
+        const t = this.selectedTool;
+        document.getElementById('nas-color2-row').classList.toggle('hidden', t !== 'gradient');
+        document.getElementById('nas-pattern-row').classList.toggle('hidden', t !== 'pattern');
+        document.getElementById('nas-sticker-row').classList.toggle('hidden', t !== 'sticker');
+        document.getElementById('nas-col1-label').textContent =
+            t === 'gradient' ? 'Color 1:' : 'Color:';
+    }
+
+    /* ── Pattern / sticker / dir pickers ─────────────── */
+    _bindPatterns() {
+        document.querySelectorAll('.nas-pat-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.selectedPattern = btn.dataset.pat;
+                document.querySelectorAll('.nas-pat-btn').forEach(b =>
+                    b.classList.toggle('active', b === btn));
+            });
+        });
+    }
+
+    _bindStickers() {
+        document.querySelectorAll('.nas-stk-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.selectedSticker = btn.dataset.stk;
+                document.querySelectorAll('.nas-stk-btn').forEach(b =>
+                    b.classList.toggle('active', b === btn));
+            });
+        });
+    }
+
+    _bindGradientDir() {
+        document.querySelectorAll('.nas-dir-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.gradientDir = btn.dataset.dir;
+                document.querySelectorAll('.nas-dir-btn').forEach(b =>
+                    b.classList.toggle('active', b === btn));
+            });
+        });
+    }
+
+    /* ── Apply active tool to nail i ─────────────────── */
+    _applyTool(i) {
+        const NS   = 'http://www.w3.org/2000/svg';
+        const wrap = document.querySelector(`.nas-nail-wrap[data-nail="${i}"]`);
+        const svg  = wrap.querySelector('.nas-nail-svg');
+        const base = svg.querySelector('.nas-nail-base');
+        const layer = svg.querySelector('.nas-art-layer');
+
+        const mk = (tag, attrs) => {
+            const el = document.createElementNS(NS, tag);
+            Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v));
+            return el;
+        };
+
+        if (this.selectedTool === 'clear') {
+            base.setAttribute('fill', '#f3f4f6');
+            base.setAttribute('stroke', '#d1d5db');
+            layer.innerHTML = '';
+            this.nailStates[i] = {fill: '#f3f4f6'};
+
+        } else if (this.selectedTool === 'color') {
+            base.setAttribute('fill', this.selectedColor);
+            base.setAttribute('stroke', this._darken(this.selectedColor));
+            this.nailStates[i].fill = this.selectedColor;
+
+        } else if (this.selectedTool === 'gradient') {
+            const grad = svg.querySelector(`#nas-grad-${i}`);
+            const stops = grad.querySelectorAll('stop');
+            const dirs = {vertical: [0,0,0,1], horizontal: [0,0,1,0], diagonal: [0,0,1,1]};
+            const [x1,y1,x2,y2] = dirs[this.gradientDir];
+            grad.setAttribute('x1', x1); grad.setAttribute('y1', y1);
+            grad.setAttribute('x2', x2); grad.setAttribute('y2', y2);
+            stops[0].setAttribute('stop-color', this.selectedColor);
+            stops[1].setAttribute('stop-color', this.selectedColor2);
+            base.setAttribute('fill', `url(#nas-grad-${i})`);
+            base.setAttribute('stroke', this._darken(this.selectedColor));
+            this.nailStates[i].fill = 'gradient';
+
+        } else if (this.selectedTool === 'pattern') {
+            layer.querySelectorAll('.nas-pat-el').forEach(el => el.remove());
+            const c = this.selectedColor;
+            const pat = this.selectedPattern;
+
+            if (pat === 'stripes') {
+                for (let y = 0; y < 160; y += 14)
+                    layer.appendChild(mk('rect', {x:0, y, width:100, height:6, fill:c, opacity:'0.45', class:'nas-pat-el'}));
+
+            } else if (pat === 'dots') {
+                for (let row = 0; row <= 8; row++)
+                    for (let col = 0; col <= 5; col++)
+                        layer.appendChild(mk('circle', {cx: 8+col*16, cy: 12+row*18, r:5, fill:c, opacity:'0.55', class:'nas-pat-el'}));
+
+            } else if (pat === 'checker') {
+                for (let row = 0; row < 9; row++)
+                    for (let col = 0; col < 7; col++)
+                        if ((row+col)%2===0)
+                            layer.appendChild(mk('rect', {x:col*16, y:row*18, width:16, height:18, fill:c, opacity:'0.42', class:'nas-pat-el'}));
+
+            } else if (pat === 'waves') {
+                for (let y = 14; y <= 160; y += 22) {
+                    const path = document.createElementNS(NS, 'path');
+                    path.setAttribute('d', `M 0,${y} Q 25,${y-10} 50,${y} Q 75,${y+10} 100,${y}`);
+                    path.setAttribute('fill', 'none');
+                    path.setAttribute('stroke', c);
+                    path.setAttribute('stroke-width', '4');
+                    path.setAttribute('opacity', '0.55');
+                    path.setAttribute('class', 'nas-pat-el');
+                    layer.appendChild(path);
+                }
+
+            } else if (pat === 'diamonds') {
+                for (let row = 0; row <= 6; row++)
+                    for (let col = 0; col <= 4; col++) {
+                        const cx = 8 + col*20 + (row%2===0?0:10), cy = 15+row*22;
+                        layer.appendChild(mk('polygon', {
+                            points:`${cx},${cy-9} ${cx+8},${cy} ${cx},${cy+9} ${cx-8},${cy}`,
+                            fill:c, opacity:'0.5', class:'nas-pat-el'
+                        }));
+                    }
+
+            } else if (pat === 'flowers') {
+                [[50,30],[25,65],[75,65],[35,105],[65,105],[50,138]].forEach(([cx,cy]) => {
+                    for (let p = 0; p < 5; p++) {
+                        const a = (p*Math.PI*2/5) - Math.PI/2;
+                        layer.appendChild(mk('circle', {cx: cx+10*Math.cos(a), cy: cy+10*Math.sin(a), r:5.5, fill:c, opacity:'0.5', class:'nas-pat-el'}));
+                    }
+                    layer.appendChild(mk('circle', {cx, cy, r:4, fill:'white', opacity:'0.7', class:'nas-pat-el'}));
+                });
+            }
+
+        } else if (this.selectedTool === 'sticker') {
+            const tx = document.createElementNS(NS, 'text');
+            tx.setAttribute('x', 20 + Math.random() * 55);
+            tx.setAttribute('y', 28 + Math.random() * 98);
+            tx.setAttribute('font-size', '20');
+            tx.setAttribute('text-anchor', 'middle');
+            tx.setAttribute('dominant-baseline', 'middle');
+            layer.appendChild(tx);
+            tx.textContent = this.selectedSticker;
+        }
+
+        this._sparkle(wrap);
+        this._playPop();
+    }
+
+    /* ── Helpers ──────────────────────────────────────── */
+    _sparkle(el) {
+        el.classList.add('mkv-sparkle-pop');
+        setTimeout(() => el.classList.remove('mkv-sparkle-pop'), 450);
+    }
+
+    _playPop() {
+        try { sound._note(880, 'sine', 0.12, 0.18); } catch(e) {}
+    }
+
+    _darken(hex) {
+        const n = parseInt(hex.replace('#',''), 16);
+        const r = Math.max(0, (n>>16)-30);
+        const g = Math.max(0, ((n>>8)&0xff)-30);
+        const b = Math.max(0, (n&0xff)-30);
+        return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+    }
+
+    /* ── Action buttons ───────────────────────────────── */
+    _bindButtons() {
+        document.getElementById('nas-done-btn').addEventListener('click', () => {
+            document.getElementById('nas-celebration').classList.remove('hidden');
+            launchBigConfetti();
+            try { sound.playWin(); } catch(e) {}
+        });
+
+        ['nas-clear-all-btn','nas-reset-btn'].forEach(id => {
+            document.getElementById(id).addEventListener('click', () => this._reset());
+        });
+    }
+
+    _reset() {
+        this.nailStates = Array.from({length: 5}, () => ({fill: '#f3f4f6'}));
+        document.querySelectorAll('.nas-nail-wrap').forEach((wrap, i) => {
+            const svg = wrap.querySelector('.nas-nail-svg');
+            svg.querySelector('.nas-nail-base').setAttribute('fill', '#f3f4f6');
+            svg.querySelector('.nas-nail-base').setAttribute('stroke', '#d1d5db');
+            svg.querySelector('.nas-art-layer').innerHTML = '';
+            const stops = svg.querySelectorAll(`#nas-grad-${i} stop`);
+            stops.forEach(s => s.setAttribute('stop-color', '#f3f4f6'));
+        });
+        document.getElementById('nas-celebration').classList.add('hidden');
+    }
+}
+
+let nailArtStudio = null;
+document.getElementById('tab-nas').addEventListener('click', () => {
+    if (!nailArtStudio) nailArtStudio = new NailArtStudio();
+});

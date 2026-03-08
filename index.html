@@ -31,6 +31,8 @@
 <nav id="tab-bar">
     <button class="tab-btn active" data-tab="snl" id="tab-snl">🎲 <span id="tab-snl-label">Creatures &amp; Ladders</span></button>
     <button class="tab-btn" data-tab="ttt" id="tab-ttt">❌ Tic-Tac-Toe</button>
+    <button class="tab-btn" data-tab="mkv" id="tab-mkv">💅 Princess Makeover</button>
+    <button class="tab-btn" data-tab="nas" id="tab-nas">🎨 Nail Art Studio</button>
     <button id="mute-btn" class="mute-btn" aria-label="Mute sounds" title="Mute / Unmute sounds">🔊</button>
 </nav>
 
@@ -142,6 +144,247 @@
             </div>
         </div>
     </div>
+
+    <!-- PRINCESS MAKEOVER PANEL -->
+    <div id="mkv-panel" class="tab-panel hidden">
+      <div id="mkv-game">
+        <h1 class="kids-title mkv-main-title">💅 Princess Makeover</h1>
+
+        <!-- Skin tone selector -->
+        <div class="mkv-row">
+          <h2 class="mkv-row-label">🎨 Pick a skin tone:</h2>
+          <div id="mkv-skin-tones" role="group" aria-label="Skin tone">
+            <button class="mkv-skin-btn active" data-skin="0" style="background:#fcd9b6;" aria-pressed="true" title="Light"></button>
+            <button class="mkv-skin-btn" data-skin="1" style="background:#f4b88a;" aria-pressed="false" title="Medium Light"></button>
+            <button class="mkv-skin-btn" data-skin="2" style="background:#c68642;" aria-pressed="false" title="Medium"></button>
+            <button class="mkv-skin-btn" data-skin="3" style="background:#8d5524;" aria-pressed="false" title="Medium Dark"></button>
+            <button class="mkv-skin-btn" data-skin="4" style="background:#4a2912;" aria-pressed="false" title="Dark"></button>
+          </div>
+        </div>
+
+        <!-- Color palette -->
+        <div class="mkv-row">
+          <h2 class="mkv-row-label">🌈 Pick a colour:</h2>
+          <div id="mkv-palette" role="group" aria-label="Pick a colour"></div>
+        </div>
+
+        <!-- Nail art style -->
+        <div class="mkv-row">
+          <h2 class="mkv-row-label">💅 Nail Art:</h2>
+          <div id="mkv-nail-art" role="group" aria-label="Nail art style">
+            <button class="mkv-art-btn active" data-art="plain">Plain</button>
+            <button class="mkv-art-btn" data-art="french">French</button>
+            <button class="mkv-art-btn" data-art="glitter">✨ Glitter</button>
+            <button class="mkv-art-btn" data-art="stripes">▤ Stripes</button>
+            <button class="mkv-art-btn" data-art="dots">⬤ Dots</button>
+            <button class="mkv-art-btn" data-art="hearts">❤ Hearts</button>
+            <button class="mkv-art-btn" data-art="stars">⭐ Stars</button>
+          </div>
+        </div>
+
+        <!-- Four sections grid -->
+        <div id="mkv-sections">
+
+          <!-- Finger nails -->
+          <div class="mkv-section">
+            <h2 class="mkv-section-title">🖐 Nail Salon</h2>
+            <svg id="mkv-nails-svg" viewBox="0 0 320 130" aria-label="Fingernails to paint">
+              <!-- Left hand label -->
+              <text x="80" y="125" text-anchor="middle" font-size="9" fill="#a78bfa">Left hand</text>
+              <!-- Right hand label -->
+              <text x="240" y="125" text-anchor="middle" font-size="9" fill="#a78bfa">Right hand</text>
+              <!-- Left hand: nails 0-4 -->
+              <rect class="mkv-nail" data-nail="0" x="10"  y="10" width="26" height="50" rx="13"/>
+              <rect class="mkv-nail" data-nail="1" x="44"  y="4"  width="26" height="56" rx="13"/>
+              <rect class="mkv-nail" data-nail="2" x="78"  y="2"  width="26" height="58" rx="13"/>
+              <rect class="mkv-nail" data-nail="3" x="112" y="6"  width="26" height="54" rx="13"/>
+              <rect class="mkv-nail" data-nail="4" x="142" y="18" width="20" height="40" rx="10"/>
+              <!-- Right hand: nails 5-9 -->
+              <rect class="mkv-nail" data-nail="5" x="170" y="18" width="20" height="40" rx="10"/>
+              <rect class="mkv-nail" data-nail="6" x="198" y="6"  width="26" height="54" rx="13"/>
+              <rect class="mkv-nail" data-nail="7" x="232" y="2"  width="26" height="58" rx="13"/>
+              <rect class="mkv-nail" data-nail="8" x="266" y="4"  width="26" height="56" rx="13"/>
+              <rect class="mkv-nail" data-nail="9" x="296" y="10" width="16" height="50" rx="8"/>
+            </svg>
+          </div>
+
+          <!-- Toe nails / pedicure -->
+          <div class="mkv-section">
+            <h2 class="mkv-section-title">🦶 Pedicure</h2>
+            <svg id="mkv-toes-svg" viewBox="0 0 320 130" aria-label="Toenails to paint">
+              <text x="80" y="125" text-anchor="middle" font-size="9" fill="#a78bfa">Left foot</text>
+              <text x="240" y="125" text-anchor="middle" font-size="9" fill="#a78bfa">Right foot</text>
+              <!-- Left foot: toes 0-4 (big toe is largest) -->
+              <rect class="mkv-toe" data-toe="0" x="10"  y="12" width="30" height="55" rx="15"/>
+              <rect class="mkv-toe" data-toe="1" x="48"  y="16" width="25" height="50" rx="12"/>
+              <rect class="mkv-toe" data-toe="2" x="80"  y="20" width="22" height="46" rx="11"/>
+              <rect class="mkv-toe" data-toe="3" x="109" y="24" width="20" height="42" rx="10"/>
+              <rect class="mkv-toe" data-toe="4" x="136" y="30" width="18" height="36" rx="9"/>
+              <!-- Right foot: toes 5-9 -->
+              <rect class="mkv-toe" data-toe="5" x="170" y="30" width="18" height="36" rx="9"/>
+              <rect class="mkv-toe" data-toe="6" x="195" y="24" width="20" height="42" rx="10"/>
+              <rect class="mkv-toe" data-toe="7" x="222" y="20" width="22" height="46" rx="11"/>
+              <rect class="mkv-toe" data-toe="8" x="252" y="16" width="25" height="50" rx="12"/>
+              <rect class="mkv-toe" data-toe="9" x="284" y="12" width="30" height="55" rx="15"/>
+            </svg>
+          </div>
+
+          <!-- Face makeup -->
+          <div class="mkv-section mkv-section-face">
+            <h2 class="mkv-section-title">✨ Face Makeover</h2>
+            <svg id="mkv-face-svg" viewBox="0 0 200 230" aria-label="Face to apply makeup">
+              <!-- Neck -->
+              <rect x="82" y="188" width="36" height="38" rx="8" fill="#fcd9b6" id="mkv-neck"/>
+              <!-- Face skin base -->
+              <ellipse cx="100" cy="112" rx="80" ry="90" fill="#fcd9b6" id="mkv-face-base"/>
+              <!-- Hair (interactive – click to change colour) -->
+              <ellipse class="mkv-face-part" data-part="hair" cx="100" cy="52" rx="82" ry="46" fill="#8B4513" id="mkv-hair"/>
+              <!-- Forehead cover (to show hair only above face) -->
+              <ellipse cx="100" cy="112" rx="80" ry="90" fill="#fcd9b6" id="mkv-face-cover"/>
+
+              <!-- Eyeshadow areas (interactive, above eyes) -->
+              <ellipse class="mkv-face-part" data-part="shadow-l" cx="65" cy="86" rx="22" ry="10" fill="transparent" opacity="0.7" id="mkv-shadow-l"/>
+              <ellipse class="mkv-face-part" data-part="shadow-r" cx="135" cy="86" rx="22" ry="10" fill="transparent" opacity="0.7" id="mkv-shadow-r"/>
+
+              <!-- Eye whites -->
+              <ellipse cx="65" cy="100" rx="18" ry="12" fill="white"/>
+              <ellipse cx="135" cy="100" rx="18" ry="12" fill="white"/>
+              <!-- Pupils -->
+              <circle cx="65" cy="100" r="7" fill="#3d2b1f"/>
+              <circle cx="135" cy="100" r="7" fill="#3d2b1f"/>
+              <!-- Eye shine -->
+              <circle cx="68" cy="97" r="2.5" fill="white"/>
+              <circle cx="138" cy="97" r="2.5" fill="white"/>
+              <!-- Eyelashes top -->
+              <path d="M47,91 Q65,82 83,91" fill="none" stroke="#2d1a0e" stroke-width="3" stroke-linecap="round"/>
+              <path d="M117,91 Q135,82 153,91" fill="none" stroke="#2d1a0e" stroke-width="3" stroke-linecap="round"/>
+
+              <!-- Nose -->
+              <path d="M96,115 Q100,130 104,115" fill="none" stroke="#c8956e" stroke-width="2" stroke-linecap="round"/>
+
+              <!-- Blush cheeks (interactive) -->
+              <ellipse class="mkv-face-part" data-part="blush-l" cx="42" cy="128" rx="20" ry="13" fill="#ffb3c6" opacity="0.5" id="mkv-blush-l"/>
+              <ellipse class="mkv-face-part" data-part="blush-r" cx="158" cy="128" rx="20" ry="13" fill="#ffb3c6" opacity="0.5" id="mkv-blush-r"/>
+
+              <!-- Lips (interactive) -->
+              <path class="mkv-face-part" data-part="lips"
+                d="M78,152 Q87,145 100,148 Q113,145 122,152 Q113,165 100,167 Q87,165 78,152 Z"
+                fill="#e57373" id="mkv-lips"/>
+              <!-- Lip highlight -->
+              <path d="M88,151 Q100,148 112,151" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+
+              <!-- Earring spots (interactive) -->
+              <circle class="mkv-face-part" data-part="earring-l" cx="18" cy="130" r="10" fill="transparent" stroke="#d1d5db" stroke-width="1.5" stroke-dasharray="3 2" id="mkv-earring-l"/>
+              <circle class="mkv-face-part" data-part="earring-r" cx="182" cy="130" r="10" fill="transparent" stroke="#d1d5db" stroke-width="1.5" stroke-dasharray="3 2" id="mkv-earring-r"/>
+
+              <!-- Freckles (populated by JS) -->
+              <g id="mkv-freckles-group" aria-hidden="true"></g>
+
+              <!-- Necklace (populated by JS) -->
+              <g id="mkv-necklace-group" aria-hidden="true"></g>
+
+              <!-- Sunglasses (hidden by default) -->
+              <g id="mkv-sunglasses" display="none">
+                <rect x="42" y="90" width="40" height="26" rx="8" fill="#1e293b" opacity="0.85"/>
+                <rect x="118" y="90" width="40" height="26" rx="8" fill="#1e293b" opacity="0.85"/>
+                <line x1="82" y1="103" x2="118" y2="103" stroke="#475569" stroke-width="2.5"/>
+                <line x1="18" y1="103" x2="42" y2="103" stroke="#475569" stroke-width="2"/>
+                <line x1="158" y1="103" x2="182" y2="103" stroke="#475569" stroke-width="2"/>
+              </g>
+
+              <!-- Hat (hidden by default) -->
+              <g id="mkv-hat" display="none">
+                <!-- Hat brim -->
+                <ellipse cx="100" cy="30" rx="92" ry="12" fill="#ec4899"/>
+                <!-- Hat crown -->
+                <rect x="55" y="-30" width="90" height="68" rx="8" fill="#ec4899"/>
+                <!-- Hat band -->
+                <rect x="55" y="20" width="90" height="12" rx="2" fill="#be185d"/>
+                <!-- Bow -->
+                <path d="M85,26 Q100,14 115,26 Q100,20 85,26Z" fill="#fce7f3"/>
+              </g>
+            </svg>
+          </div>
+
+          <!-- Accessories -->
+          <div class="mkv-section">
+            <h2 class="mkv-section-title">💎 Accessories</h2>
+            <div class="mkv-accessories">
+
+              <!-- Earring picker -->
+              <div class="mkv-accessory-row">
+                <span class="mkv-accessory-label">Earrings:</span>
+                <div class="mkv-accessory-btns" role="group" aria-label="Earring style">
+                  <button class="mkv-acc-btn active" data-acc="earring" data-style="none"     title="No earrings">✕</button>
+                  <button class="mkv-acc-btn"        data-acc="earring" data-style="circle"   title="Circle studs">⬤</button>
+                  <button class="mkv-acc-btn"        data-acc="earring" data-style="star"     title="Star earrings">⭐</button>
+                  <button class="mkv-acc-btn"        data-acc="earring" data-style="heart"    title="Heart earrings">❤️</button>
+                  <button class="mkv-acc-btn"        data-acc="earring" data-style="diamond"  title="Diamond drops">💎</button>
+                </div>
+              </div>
+
+              <!-- Sunglasses toggle -->
+              <div class="mkv-accessory-row">
+                <span class="mkv-accessory-label">Sunglasses:</span>
+                <div class="mkv-accessory-btns" role="group" aria-label="Sunglasses">
+                  <button class="mkv-acc-btn active" data-acc="sunglasses" data-style="off"  title="No sunglasses">✕</button>
+                  <button class="mkv-acc-btn"        data-acc="sunglasses" data-style="dark" title="Dark shades">🕶️</button>
+                  <button class="mkv-acc-btn"        data-acc="sunglasses" data-style="pink" title="Pink shades">🌸</button>
+                  <button class="mkv-acc-btn"        data-acc="sunglasses" data-style="blue" title="Blue shades">💙</button>
+                </div>
+              </div>
+
+              <!-- Hat picker -->
+              <div class="mkv-accessory-row">
+                <span class="mkv-accessory-label">Hat / Cap:</span>
+                <div class="mkv-accessory-btns" role="group" aria-label="Hat style">
+                  <button class="mkv-acc-btn active" data-acc="hat" data-style="none"    title="No hat">✕</button>
+                  <button class="mkv-acc-btn"        data-acc="hat" data-style="princess" title="Princess tiara">👑</button>
+                  <button class="mkv-acc-btn"        data-acc="hat" data-style="cap"     title="Baseball cap">🧢</button>
+                  <button class="mkv-acc-btn"        data-acc="hat" data-style="witch"   title="Witch hat">🎩</button>
+                  <button class="mkv-acc-btn"        data-acc="hat" data-style="bow"     title="Hair bow">🎀</button>
+                </div>
+              </div>
+
+              <!-- Freckles -->
+              <div class="mkv-accessory-row">
+                <span class="mkv-accessory-label">Freckles:</span>
+                <div class="mkv-accessory-btns" role="group" aria-label="Freckles">
+                  <button class="mkv-acc-btn active" data-acc="freckles" data-style="off"  title="No freckles">✕</button>
+                  <button class="mkv-acc-btn"        data-acc="freckles" data-style="few"  title="A few freckles">· Few</button>
+                  <button class="mkv-acc-btn"        data-acc="freckles" data-style="more" title="More freckles">•• More</button>
+                </div>
+              </div>
+
+              <!-- Necklace -->
+              <div class="mkv-accessory-row">
+                <span class="mkv-accessory-label">Necklace:</span>
+                <div class="mkv-accessory-btns" role="group" aria-label="Necklace style">
+                  <button class="mkv-acc-btn active" data-acc="necklace" data-style="none"   title="No necklace">✕</button>
+                  <button class="mkv-acc-btn"        data-acc="necklace" data-style="simple" title="Simple chain">— Chain</button>
+                  <button class="mkv-acc-btn"        data-acc="necklace" data-style="pearl"  title="Pearl strand">○ Pearls</button>
+                  <button class="mkv-acc-btn"        data-acc="necklace" data-style="gem"    title="Gem pendant">💎 Gem</button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </div><!-- /#mkv-sections -->
+
+        <!-- Action buttons -->
+        <div class="mkv-actions">
+          <button id="mkv-done-btn" class="big-btn">🌟 Ta-da! Show My Look!</button>
+          <button id="mkv-reset-btn" class="secondary-btn">🧹 Start Over</button>
+        </div>
+
+        <!-- Celebration message -->
+        <div id="mkv-celebration" class="hidden">
+          <p class="mkv-celebration-text">🌟 You're a Beauty Artist! 🌟</p>
+        </div>
+
+      </div><!-- /#mkv-game -->
+    </div><!-- /#mkv-panel -->
 
     <!-- TIC-TAC-TOE PANEL -->
     <div id="ttt-panel" class="tab-panel hidden">
@@ -314,6 +557,90 @@
         </div>
         <button class="htp-close big-btn" id="ttt-htp-close">Got it! Let's play! 🚀</button>
     </div>
+</div>
+
+<!-- NAIL ART STUDIO PANEL -->
+<div id="nas-panel" class="tab-panel hidden">
+  <div id="nas-game">
+    <h1 class="nas-title">🎨 Nail Art Studio</h1>
+    <p class="nas-subtitle">Click a nail, pick your tool, and create your masterpiece!</p>
+
+    <!-- Five large nail canvases (built by JS) -->
+    <div id="nas-nails-row" role="group" aria-label="Nail canvases"></div>
+
+    <!-- Tool selector -->
+    <div class="nas-row">
+      <h2 class="nas-row-label">Tool:</h2>
+      <div id="nas-tools" role="group" aria-label="Active tool">
+        <button class="nas-tool-btn active" data-tool="color">🎨 Color</button>
+        <button class="nas-tool-btn" data-tool="gradient">🌈 Gradient</button>
+        <button class="nas-tool-btn" data-tool="pattern">✦ Pattern</button>
+        <button class="nas-tool-btn" data-tool="sticker">⭐ Sticker</button>
+        <button class="nas-tool-btn" data-tool="clear">🗑 Clear</button>
+      </div>
+    </div>
+
+    <!-- Color 1 (always visible) -->
+    <div class="nas-row">
+      <h2 class="nas-row-label" id="nas-col1-label">Color:</h2>
+      <div id="nas-palette1" role="group" aria-label="Primary colour"></div>
+    </div>
+
+    <!-- Color 2 + direction (gradient tool only) -->
+    <div class="nas-row hidden" id="nas-color2-row">
+      <h2 class="nas-row-label">Color 2:</h2>
+      <div id="nas-palette2" role="group" aria-label="Secondary colour"></div>
+      <div id="nas-grad-dir" role="group" aria-label="Gradient direction">
+        <button class="nas-dir-btn active" data-dir="vertical">↕ Top→Bottom</button>
+        <button class="nas-dir-btn" data-dir="horizontal">↔ Side→Side</button>
+        <button class="nas-dir-btn" data-dir="diagonal">↘ Diagonal</button>
+      </div>
+    </div>
+
+    <!-- Pattern picker (pattern tool only) -->
+    <div class="nas-row hidden" id="nas-pattern-row">
+      <h2 class="nas-row-label">Pattern:</h2>
+      <div id="nas-patterns" role="group" aria-label="Pattern style">
+        <button class="nas-pat-btn active" data-pat="stripes">▤ Stripes</button>
+        <button class="nas-pat-btn" data-pat="dots">⬤ Dots</button>
+        <button class="nas-pat-btn" data-pat="checker">▦ Checker</button>
+        <button class="nas-pat-btn" data-pat="waves">〜 Waves</button>
+        <button class="nas-pat-btn" data-pat="diamonds">◆ Diamonds</button>
+        <button class="nas-pat-btn" data-pat="flowers">✿ Flowers</button>
+      </div>
+    </div>
+
+    <!-- Sticker picker (sticker tool only) -->
+    <div class="nas-row hidden" id="nas-sticker-row">
+      <h2 class="nas-row-label">Sticker:</h2>
+      <div id="nas-stickers" role="group" aria-label="Sticker choice">
+        <button class="nas-stk-btn active" data-stk="⭐">⭐</button>
+        <button class="nas-stk-btn" data-stk="❤️">❤️</button>
+        <button class="nas-stk-btn" data-stk="💎">💎</button>
+        <button class="nas-stk-btn" data-stk="🌸">🌸</button>
+        <button class="nas-stk-btn" data-stk="🦋">🦋</button>
+        <button class="nas-stk-btn" data-stk="✨">✨</button>
+        <button class="nas-stk-btn" data-stk="🌙">🌙</button>
+        <button class="nas-stk-btn" data-stk="🌈">🌈</button>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="nas-actions">
+      <button id="nas-clear-all-btn" class="nas-btn nas-btn-secondary">🗑 Clear All</button>
+      <button id="nas-done-btn" class="nas-btn nas-btn-primary">✨ Done!</button>
+    </div>
+
+    <!-- Celebration overlay -->
+    <div id="nas-celebration" class="hidden">
+      <div class="nas-celeb-inner">
+        <div class="nas-celeb-emoji">💅✨💅</div>
+        <h2>Stunning nails!</h2>
+        <p>Your nail art is absolutely fabulous!</p>
+        <button id="nas-reset-btn" class="nas-btn nas-btn-primary">🔄 Start Over</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script src="script.js"></script>
